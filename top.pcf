@@ -1,0 +1,39 @@
+###############################################################################
+# Family & Device:    iCE40UP5K
+# Package:            SG48
+###############################################################################
+
+set_io --warn-no-port pin_col_first   28
+set_io --warn-no-port pin_col_advance 4
+
+set_io --warn-no-port pin_row_oe_n  32
+set_io --warn-no-port pin_row_bank0 37
+set_io --warn-no-port pin_row_bank1 36
+set_io --warn-no-port pin_row_bank2 35
+set_io --warn-no-port pin_row_bank3 34
+
+set_io --warn-no-port pin_rclk 3
+set_io --warn-no-port pin_r0a  38
+set_io --warn-no-port pin_r0b  42
+set_io --warn-no-port pin_r1a  43
+set_io --warn-no-port pin_r1b  44
+set_io --warn-no-port pin_r2a  45
+set_io --warn-no-port pin_r2b  46
+set_io --warn-no-port pin_r3a  47
+set_io --warn-no-port pin_r3b  48
+
+set_io --warn-no-port pin_mic_data 9
+set_io --warn-no-port pin_mic_clk  10
+
+set_io --warn-no-port pin_fpga_int 11
+set_io --warn-no-port pin_clk      20
+
+set_io --warn-no-port pin_miso 17
+set_io --warn-no-port pin_cs   16
+set_io --warn-no-port pin_mosi 14
+set_io --warn-no-port pin_sck  15
+
+set_io --warn-no-port pin_usbp 25
+set_io --warn-no-port pin_usbn 23
+set_io --warn-no-port pin_pu   27
+

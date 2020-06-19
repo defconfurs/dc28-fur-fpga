@@ -1,0 +1,11 @@
+*.gtkw
+*_Implmnt/
+stdout.log
+synlog.tcl
+*~
+*.swp
+*bak
+gerbers/
+build/
+*.pyc
+OLD
