@@ -50,38 +50,47 @@
 */
 
 module usb_uart_bridge_ep (
-  input clk,
-  input reset,
+  ////////////////////
+  // endpoint clocks
+  ////////////////////
+  input        clk,
+  input        reset,
 
   ////////////////////
   // out endpoint interface
   ////////////////////
-  output out_ep_req,               // request the data interface for the out endpoint
-  input out_ep_grant,              // data interface granted
-  input out_ep_data_avail,         // flagging data available to get from the host - stays up until the cycle upon which it is empty
-  input out_ep_setup,              // [setup packet sent? - not used here]
-  output out_ep_data_get,          // request to get the data
-  input [7:0] out_ep_data,         // data from the host
-  output out_ep_stall,             // an output enabling the device to stop inputs (not used)
-  input out_ep_acked,              // indicating that the outgoing data was acked
+  output       out_ep_req, // request the data interface for the out endpoint
+  input        out_ep_grant, // data interface granted
+  input        out_ep_data_avail, // flagging data available to get from the host - stays up until the cycle upon which it is empty
+  input        out_ep_setup, // [setup packet sent? - not used here]
+  output       out_ep_data_get, // request to get the data
+  input [7:0]  out_ep_data, // data from the host
+  output       out_ep_stall, // an output enabling the device to stop inputs (not used)
+  input        out_ep_acked, // indicating that the outgoing data was acked
 
   ////////////////////
   // in endpoint interface
   ////////////////////
-  output in_ep_req,                // request the data interface for the in endpoint
-  input in_ep_grant,               // data interface granted
-  input in_ep_data_free,           // end point is ready for data - (specifically there is a buffer and it has space)
+  output       in_ep_req, // request the data interface for the in endpoint
+  input        in_ep_grant, // data interface granted
+  input        in_ep_data_free, // end point is ready for data - (specifically there is a buffer and it has space)
                                    // after going low it takes a while to get another back, but it does this automatically
-  output in_ep_data_put,           // forces end point to read our data
-  output [7:0] in_ep_data,         // data back to the host
-  output in_ep_data_done,          // signalling that we're done sending data
-  output in_ep_stall,              // an output enabling the device to stop outputs (not used)
-  input in_ep_acked,               // indicating that the outgoing data was acked
+  output       in_ep_data_put, // forces end point to read our data
+  output [7:0] in_ep_data, // data back to the host
+  output       in_ep_data_done, // signalling that we're done sending data
+  output       in_ep_stall, // an output enabling the device to stop outputs (not used)
+  input        in_ep_acked, // indicating that the outgoing data was acked
 
+  ////////////////////
+  // uart pipeline interfaces
+  ////////////////////
+  // uart clocks
+  input        uart_clk,
+                           
   // uart pipeline in
-  input [7:0] uart_in_data,
-  input       uart_in_valid,
-  output      uart_in_ready,
+  input [7:0]  uart_in_data,
+  input        uart_in_valid,
+  output       uart_in_ready,
 
   // uart pipeline out
   output [7:0] uart_out_data,
@@ -91,6 +100,76 @@ module usb_uart_bridge_ep (
   output [3:0] debug
 );
 
+  localparam UART_CROSS_IDLE     = 4'b0001;
+  localparam UART_CROSS_VALID    = 4'b0010;
+  localparam UART_CROSS_LOWCLK   = 4'b0100;
+  localparam UART_CROSS_FINISHED = 4'b1000;
+  reg [2:0]    uart_in_state;
+  
+  reg [7:0]    uart_in_data_cross;
+  reg          uart_in_valid_cross;
+  reg          uart_in_ready_cross;
+  always @(posedge clk) begin
+    case(uart_in_state)
+    UART_CROSS_IDLE: begin
+      uart_in_data_cross <= uart_in_data;
+      if (uart_in_valid) begin
+        uart_in_valid_cross <= 1;
+        uart_in_state       <= UART_CROSS_VALID;
+      end
+      else begin
+        uart_in_valid_cross <= 0;
+      end
+    end
+    
+    UART_CROSS_VALID: begin
+      if (in_ep_grant) begin
+        uart_in_valid_cross          <= 0;
+        if (!uart_clk) uart_in_state <= UART_CROSS_FINISHED;
+        else           uart_in_state <= UART_CROSS_LOWCLK;
+        
+      end
+    end
+
+    UART_CROSS_LOWCLK: begin
+      if (!uart_clk) uart_in_state <= UART_CROSS_FINISHED;
+    end
+    
+    UART_CROSS_FINISHED: begin
+      if (uart_clk) uart_in_state <= UART_CROSS_IDLE;
+    end
+
+    default:
+        uart_in_state <= UART_CROSS_IDLE;
+    endcase
+  end
+
+  reg          uart_out_ready_cross;
+  reg [2:0]    uart_out_state;
+  always @(posedge clk) begin
+    case (uart_out_state)
+    UART_CROSS_IDLE: begin
+      uart_out_ready_cross <= uart_out_ready;
+      if (uart_out_valid) begin
+        uart_out_state       <= UART_CROSS_LOWCLK;
+        uart_out_ready_cross <= 0;
+      end
+    end
+    
+    UART_CROSS_LOWCLK: begin
+      if (!uart_clk) uart_out_state <= UART_CROSS_FINISHED;
+    end
+    
+    UART_CROSS_FINISHED: begin
+      if (uart_clk) uart_out_state <= UART_CROSS_IDLE;
+    end
+    
+    default:
+        uart_out_state <= UART_CROSS_IDLE;
+    endcase
+  end
+  
+  
   // Timeout counter width.
   localparam TimeoutWidth = 3;
 
@@ -127,7 +206,7 @@ module usb_uart_bridge_ep (
 
   assign out_granted_data_available = out_ep_req && out_ep_grant;
 
-  assign out_ep_data_get = ( uart_out_ready || ~uart_out_valid_reg ) && out_ep_data_get_reg;
+  assign out_ep_data_get = ( uart_out_ready_cross || ~uart_out_valid_reg ) && out_ep_data_get_reg;
 
   reg [7:0] out_stall_data;
   reg       out_stall_valid;
@@ -161,7 +240,7 @@ module usb_uart_bridge_ep (
               PipelineOutState_WaitData: begin
                   // it takes one cycle for the juices to start flowing
                   // we got here when we were starting or if the outgoing pipe stalled
-                  if ( uart_out_ready || ~uart_out_valid_reg ) begin
+                  if ( uart_out_ready_cross || ~uart_out_valid_reg ) begin
                       //if we were stalled, we can send the byte we caught while we were stalled
                       // the actual stalled byte now having been VALID & READY'ed
                       if ( out_stall_valid ) begin
@@ -181,7 +260,7 @@ module usb_uart_bridge_ep (
               end
               PipelineOutState_PushData: begin
                   // can grab a character if either the out was accepted or the out reg is empty
-                  if ( uart_out_ready || ~uart_out_valid_reg ) begin
+                  if ( uart_out_ready_cross || ~uart_out_valid_reg ) begin
                     // now we really have got some data and a place to shove it
                     uart_out_data_reg <= out_ep_data;
                     uart_out_valid_reg <= 1;
@@ -203,7 +282,7 @@ module usb_uart_bridge_ep (
               PipelineOutState_WaitPipeline: begin
                   // unhand the bus (don't want to block potential incoming) - be careful, this works instantly!
                   out_ep_req_reg <= 0;
-                  if ( uart_out_ready ) begin
+                  if ( uart_out_ready_cross ) begin
                       uart_out_valid_reg <= 0;
                       uart_out_data_reg <= 0;
                       pipeline_out_state <= PipelineOutState_Idle;
@@ -234,18 +313,18 @@ module usb_uart_bridge_ep (
   // It is granted automatically if available, and latched on by the SM.
   // Note once requested, uart_in_valid may go on and off as data is available.
   // When requested, connect the end point registers to the outgoing ports
-  assign in_ep_req = ( uart_in_valid && in_ep_data_free) || in_ep_req_reg;
+  assign in_ep_req = ( uart_in_valid_cross && in_ep_data_free) || in_ep_req_reg;
 
   // Confirmation that the bus was granted
-  wire in_granted_in_valid = in_ep_grant && uart_in_valid;
+  wire in_granted_in_valid = in_ep_grant && uart_in_valid_cross;
 
   // Here are the things we use to get data sent
   // ... put this word
-  assign in_ep_data_put = ( pipeline_in_state == PipelineInState_CycleData ) && uart_in_valid && in_ep_data_free;
+  assign in_ep_data_put = ( pipeline_in_state == PipelineInState_CycleData ) && uart_in_valid_cross && in_ep_data_free;
   // ... we're done putting - send the buffer
   assign in_ep_data_done = in_ep_data_done_reg;
   // ... the actual data, direct from the pipeline to the usb in buffer
-  assign in_ep_data = uart_in_data;
+  assign in_ep_data = uart_in_data_cross;
 
   // If we have a half filled buffer, send it after a while by using a timer
   // 4 bits of counter, we'll just count up until bit 3 is high... 8 clock cycles seems more than enough to wait
@@ -270,7 +349,7 @@ module usb_uart_bridge_ep (
                   end
               end
               PipelineInState_CycleData: begin
-                  if  (uart_in_valid ) begin
+                  if  (uart_in_valid_cross ) begin
                       if ( ~in_ep_data_free ) begin
                         // back to idle
                         pipeline_in_state <= PipelineInState_Idle;
@@ -286,7 +365,7 @@ module usb_uart_bridge_ep (
               end
               PipelineInState_WaitData: begin
                   in_ep_timeout <= in_ep_timeout + 1;
-                  if ( uart_in_valid ) begin
+                  if ( uart_in_valid_cross ) begin
                       pipeline_in_state <= PipelineInState_CycleData;                
                   end else begin
                         // check for a timeout

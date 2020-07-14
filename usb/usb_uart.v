@@ -197,8 +197,8 @@ module usb_uart (
   wire sof_valid;
   wire [10:0] frame_index;
 
-  reg [31:0] host_presence_timer = 0;
-  reg host_presence_timeout = 0;
+  //reg [31:0]  host_presence_timer = 0;
+  //reg host_presence_timeout = 0;
 
   usb_serial_ctrl_ep ctrl_ep_inst (
     .clk(clk_48mhz),
@@ -316,16 +316,16 @@ module usb_uart (
   // host presence detection
   ////////////////////////////////////////////////////////////////////////////////
 
-  always @(posedge clk_48mhz) begin
-    if (sof_valid) begin
-      host_presence_timer <= 0;
-      host_presence_timeout <= 0;
-    end else begin
-      host_presence_timer <= host_presence_timer + 1;
-    end
-
-    if (host_presence_timer > 48000000) begin
-      host_presence_timeout <= 1;
-    end
-  end
+  //always @(posedge clk_48mhz) begin
+  //  if (sof_valid) begin
+  //    host_presence_timer <= 0;
+  //    host_presence_timeout <= 0;
+  //  end else begin
+  //    host_presence_timer <= host_presence_timer + 1;
+  //  end
+  //
+  //  if (host_presence_timer > 48000000) begin
+  //    host_presence_timeout <= 1;
+  //  end
+  //end
 endmodule

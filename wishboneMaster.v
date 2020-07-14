@@ -84,21 +84,24 @@ module wishbone_master #(
     
     reg [4:0] state;
     reg [4:0] next_state;
+    reg [4:0] last_state;
     
     always @(posedge clk_i or posedge rst_i) begin
         if (rst_i) begin
-            state           <= STATE_IDLE;
-            latched_address <= {ADDRESS_WIDTH{1'b0}};
-            length          <= {INTERFACE_LENGTH_N{1'b0}};
-            completed       <= 1'b0;
-            timeout         <= 1'b0;
+          last_state      <= STATE_IDLE;
+          state           <= STATE_IDLE;
+          latched_address <= {ADDRESS_WIDTH{1'b0}};
+          length          <= {INTERFACE_LENGTH_N{1'b0}};
+          completed       <= 1'b0;
+          timeout         <= 1'b0;
         end
         else begin
-            state           <= next_state;
-            latched_address <= next_latched_address;
-            length          <= next_length;
-            completed       <= next_completed;
-            timeout         <= next_timeout;
+          last_state      <= state;
+          state           <= next_state;
+          latched_address <= next_latched_address;
+          length          <= next_length;
+          completed       <= next_completed;
+          timeout         <= next_timeout;
         end
     end
 
@@ -257,17 +260,20 @@ module wishbone_master #(
     reg [MAX_WAIT_N-1:0]         timeout_count;
     reg [MAX_WAIT_N-1:0]         next_timeout_count;
     
-
+    reg                          active_packet;
+    reg                          next_active_packet;
     always @(posedge clk_i or posedge rst_i) begin
         if(rst_i) begin
             last_address_offset <= ({INTERFACE_LENGTH_N{1'b0}});
             address_offset      <= ({INTERFACE_LENGTH_N{1'b0}});
             timeout_count       <= MAX_WAIT;
+            active_packet       <= 0;
         end
         else begin
             last_address_offset <= address_offset;
             address_offset      <= next_address_offset;
             timeout_count       <= next_timeout_count;
+            active_packet       <= next_active_packet;
         end
     end
 
@@ -276,7 +282,7 @@ module wishbone_master #(
             always @(posedge clk_i or posedge rst_i) begin
                 if (rst_i) data_out[i-1] <= {DATA_WIDTH{1'b0}};
                 else begin
-                    if (state == STATE_READING && last_address_offset == i-1) begin
+                    if ((last_state == STATE_READING || last_state == STATE_START_READ) && last_address_offset == i-1) begin
                         data_out[i-1] <= dat_i;
                     end
                 end
@@ -303,9 +309,10 @@ module wishbone_master #(
         write_started          = 1'b0;
         write_in_progress      = 1'b0;
 
+        next_active_packet     = 1'b0;
+      
         next_timeout_count     = MAX_WAIT;
         flag_timeout           = 1'b0;
-
 
         case (state)
         
@@ -314,9 +321,10 @@ module wishbone_master #(
         
         STATE_START_READ: begin
             if (!cyc_i) begin
-                read_started       = 1'b1;
-                read_in_progress   = 1'b1;
-                next_timeout_count = MAX_WAIT;
+              read_started       = 1'b1;
+              read_in_progress   = 1'b1;
+              next_timeout_count = MAX_WAIT;
+              next_active_packet = 1'b1;
             end
             else begin
                 if (timeout_count > 0) next_timeout_count = timeout_count - 1;
@@ -325,12 +333,14 @@ module wishbone_master #(
         end
             
         STATE_READING: begin
-            current_cycle_o   = 1'b1;
+            current_cycle_o = 1'b1;
+            current_stb_o   = active_packet;
 
             current_address_o = latched_address + address_offset;
             if (!timeout && ack_i) begin 
                 next_address_offset = address_offset + 1;
                 next_timeout_count  = MAX_WAIT;
+                next_active_packet  = 1'b1;
             end
             else begin
                 next_address_offset = address_offset;
@@ -350,6 +360,7 @@ module wishbone_master #(
                 write_started      = 1'b1;
                 write_in_progress  = 1'b1;
                 next_timeout_count = MAX_WAIT;
+                next_active_packet = 1'b1;
             end
             else begin
                 if (timeout_count > 0) next_timeout_count = timeout_count - 1;
@@ -360,11 +371,13 @@ module wishbone_master #(
         STATE_WRITING: begin
             current_we_o      = 1'b1;
             current_cycle_o   = 1'b1;
+            current_stb_o     = active_packet;
 
             current_address_o = latched_address + address_offset;
             if (!timeout && ack_i) begin 
                 next_address_offset = address_offset + 1;
                 next_timeout_count  = MAX_WAIT;
+                next_active_packet  = 1'b1;
             end
             else begin
                 next_address_offset = address_offset;

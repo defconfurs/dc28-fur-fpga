@@ -1,10 +1,12 @@
-module wishbone_master_testbench #() ();
+`timescale 1ns/100ps
+
+module spram_testbench #() ();
 
     localparam ADDRESS_WIDTH = 16;
     localparam DATA_WIDTH    = 8;
     localparam DATA_BYTES    = 1;
     localparam MAX_WAIT      = 8;
-    localparam MAX_PAYLOAD = 8;
+    localparam MAX_PAYLOAD   = 8;
     
     localparam INTERFACE_WIDTH = (MAX_PAYLOAD * DATA_WIDTH);
     localparam INTERFACE_LENGTH_N = ((MAX_PAYLOAD <=  2) ? 2 :
@@ -19,14 +21,14 @@ module wishbone_master_testbench #() ();
 
                                  
     wire [ADDRESS_WIDTH-1:0]     adr_o;
-    reg [DATA_WIDTH-1:0]         dat_i;
+    wire [DATA_WIDTH-1:0]        dat_i;
     wire [DATA_WIDTH-1:0]        dat_o;
     wire                         we_o;
     wire [DATA_BYTES-1:0]        sel_o;
     wire                         stb_o;
     reg                          cyc_i;
     wire                         cyc_o;
-    reg                          ack_i;
+    wire                         ack_i;
     wire [2:0]                   cti_o;
 
     // packet interface
@@ -79,6 +81,25 @@ module wishbone_master_testbench #() ();
         .timeout         (timeout         )
     );
 
+    wishbone_spram #(
+      .ADDRESS_WIDTH (ADDRESS_WIDTH),
+      .DATA_WIDTH    (DATA_WIDTH),
+      .DATA_BYTES    (DATA_BYTES),
+      .BASE_ADDRESS  (16'h8000)
+    ) dut_spram_inst (
+      .rst_i (rst_i),
+      .clk_i (clk_i),
+      .adr_i (adr_o),
+      .dat_i (dat_o),
+      .dat_o (dat_i),
+      .we_i  (we_o),
+      .sel_i (sel_o),
+      .stb_i (stb_o),
+      .cyc_i (cyc_o),
+      .ack_o (ack_i),
+      .cti_i (cti_o)
+    );
+
     localparam  CLOCK_PERIOD            = 100; // Clock period in ps
     localparam  INITIAL_RESET_CYCLES    = 10;  // Number of cycles to reset when simulation starts
     // Clock signal generator
@@ -100,90 +121,53 @@ module wishbone_master_testbench #() ();
 
     // Test cycle
     initial begin
-        transfer_address = 16'h0000;
-        payload_in       = 64'h0000000000000000;
-        payload_length   = 3'h0;
-        start_read       = 1'b0;
-        start_write      = 1'b0;
+      transfer_address = 16'h8000;
+      payload_in       = 64'h0000000000000000;
+      payload_length   = 3'h0;
+      start_read       = 1'b0;
+      start_write      = 1'b0;
+      cyc_i            = 0;
 
-        wait(rst);
-        wait(!rst);
-        repeat(2) @(posedge clk);
+      wait(rst);
+      wait(!rst);
+      repeat(2) @(posedge clk);
 
-        transfer_address = 16'h0012;
-        payload_in       = 64'h0000000504030201;
-        payload_length   = 3'h4;
-        @(posedge clk);
-        start_read  = 1'b1;
-        start_write = 1'b0;
-        @(posedge clk);
-        start_read  = 1'b0;
-        start_write = 1'b0;
-
-        repeat(20) @(posedge clk);
-        @(posedge clk);
-        start_read  = 1'b0;
-        start_write = 1'b1;
-        @(posedge clk);
-        start_read  = 1'b0;
-        start_write = 1'b0;
-
-        repeat(20) @(posedge clk);
-        @(posedge clk);
-        start_read  = 1'b0;
-        start_write = 1'b1;
-        @(posedge clk);
-        start_read  = 1'b0;
-        start_write = 1'b0;
+      transfer_address = 16'h8000;
+      payload_in       = 64'h77_66_55_44_33_22_11_00;
+      payload_length   = 4'h8;
+      start_write      = 1;
+      @(posedge clk);
+      start_write      = 0;
+      repeat(20) @(posedge clk);
+          
+      
+      transfer_address = 16'h8000;
+      payload_in       = 64'h0000000504030201;
+      payload_length   = 4'h8;
+      @(posedge clk);
+      start_read  = 1'b1;
+      start_write = 1'b0;
+      @(posedge clk);
+      start_read  = 1'b0;
+      start_write = 1'b0;
+      
+      repeat(20) @(posedge clk);
+      @(posedge clk);
+      start_read  = 1'b0;
+      start_write = 1'b1;
+      @(posedge clk);
+      start_read  = 1'b0;
+      start_write = 1'b0;
+      
+      repeat(20) @(posedge clk);
+      @(posedge clk);
+      start_read  = 1'b0;
+      start_write = 1'b1;
+      @(posedge clk);
+      start_read  = 1'b0;
+      start_write = 1'b0;
     end
 
-    initial begin
-        dat_i = 8'h00;
-
-        wait(cyc_o);
-        while(cyc_o) begin
-            @(posedge clk);
-            dat_i = adr_o + 8'h10;
-        end
-    end
-
-    initial begin
-        cyc_i = 1'b0;
-        ack_i = 0;
-        wait(cyc_o);
-        @(posedge clk);
-        ack_i = 1;
-        repeat(3) @(posedge clk);
-        ack_i = 0;
-        repeat(2) @(posedge clk);
-        ack_i = 1;
-        wait(!cyc_o);
-        ack_i = 0;
-
-        cyc_i = 1;
-        repeat(30) @(posedge clk);
-        cyc_i = 0;
-        
-        wait(cyc_o);
-        repeat(10) @(posedge clk);
-        ack_i = 1;
-        repeat(3) @(posedge clk);
-        ack_i = 0;
-        repeat(2) @(posedge clk);
-        ack_i = 1;
-        wait(!cyc_o);
-        ack_i = 0;
-
-        wait(cyc_o);
-        repeat(4) @(posedge clk);
-        ack_i = 1;
-        repeat(3) @(posedge clk);
-        ack_i = 0;
-        repeat(2) @(posedge clk);
-        ack_i = 1;
-        wait(!cyc_o);
-        ack_i = 0;
-    end
         
     
 endmodule

@@ -124,26 +124,29 @@ serial.v        - width adapter (x widths to y widths)
 */
 
 module usb_uart_core(
-  input  clk_48mhz,
-  input reset,
+  input         clk_48mhz,
+  input         reset,
 
   // USB lines.  Split into input vs. output and oe control signal to maintain
   // highest level of compatibility with synthesis tools.
-  output usb_p_tx,
-  output usb_n_tx,
-  input  usb_p_rx,
-  input  usb_n_rx,
-  output usb_tx_en,
+  output        usb_p_tx,
+  output        usb_n_tx,
+  input         usb_p_rx,
+  input         usb_n_rx,
+  output        usb_tx_en,
 
+  // uart clock
+  input         uart_clk,
+                     
   // uart pipeline in (into the module, out of the device, into the host)
-  input [7:0] uart_in_data,
-  input       uart_in_valid,
-  output      uart_in_ready,
+  input [7:0]   uart_in_data,
+  input         uart_in_valid,
+  output        uart_in_ready,
 
   // uart pipeline out (out of the host, into the device, out of the module)
-  output [7:0] uart_out_data,
-  output       uart_out_valid,
-  input        uart_out_ready,
+  output [7:0]  uart_out_data,
+  output        uart_out_valid,
+  input         uart_out_ready,
 
   output [11:0] debug
 );
@@ -251,6 +254,9 @@ module usb_uart_core(
     .in_ep_stall(serial_in_ep_stall),
     .in_ep_acked(serial_in_ep_acked),
 
+    // uart clk
+    .uart_clk (uart_clk),
+                                          
     // uart pipeline in
     .uart_in_data( uart_in_data ),
     .uart_in_valid( uart_in_valid ),

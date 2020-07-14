@@ -39,6 +39,7 @@ def main():
     
         # Tools used in the flow
         icepack       = os.path.join(pio, 'toolchain-ice40\\bin\\icepack.exe')
+        icemulti      = os.path.join(pio, 'toolchain-ice40\\bin\\icemulti.exe')
         arachne_pnr   = os.path.join(pio, 'toolchain-ice40\\bin\\arachne-pnr.exe')
         nextpnr_ice40 = os.path.join(pio, 'toolchain-ice40\\bin\\nextpnr-ice40.exe')
         yosys         = os.path.join(pio, 'toolchain-yosys\\bin\\yosys.exe')
@@ -55,6 +56,7 @@ def main():
         
         # Tools used in the flow
         icepack       = os.path.join(pio, 'icepack'+file_ext)
+        icemulti      = os.path.join(pio, 'icemulti'+file_ext)
         arachne_pnr   = os.path.join(pio, 'arachne-pnr'+file_ext)
         nextpnr_ice40 = os.path.join(pio, 'nextpnr-ice40'+file_ext)
         yosys         = os.path.join(pio, 'yosys'+file_ext)
@@ -62,7 +64,21 @@ def main():
         tinyprog      = 'tinyprog'
 
     sources = glob('*.v')
-    sources += glob('./usb/*.v')
+    sources += ["tinydfu-bootloader/usb/edge_detect.v",
+                "tinydfu-bootloader/usb/strobe.v",
+                "tinydfu-bootloader/usb/usb_fs_in_arb.v",
+                "tinydfu-bootloader/usb/usb_fs_in_pe.v",
+                "tinydfu-bootloader/usb/usb_fs_out_arb.v",
+                "tinydfu-bootloader/usb/usb_fs_out_pe.v",
+                "tinydfu-bootloader/usb/usb_fs_pe.v",
+                "tinydfu-bootloader/usb/usb_fs_rx.v",
+                "tinydfu-bootloader/usb/usb_fs_tx_mux.v",
+                "tinydfu-bootloader/usb/usb_fs_tx.v",
+                "tinydfu-bootloader/usb/usb_reset_det.v",
+                "tinydfu-bootloader/usb/usb_dfu_ctrl_ep.v",
+                "tinydfu-bootloader/usb/usb_spiflash_bridge.v",
+                "tinydfu-bootloader/usb/usb_dfu_core.v"]
+    #glob('./usb/*.v')
 
     for command in commands:
         # run command
@@ -74,13 +90,16 @@ def main():
                 return
             if call([icepack, name+'.asc', name+'.bin']) != 0:
                 return
+            if call([icemulti, "-v", "-o", "fw.bin", "-p0", "-A12", "-a12", name+'.bin']) != 0:
+                return
+            
             
         elif command == 'upload':
-            if call([tinyprog, '-p', name+'.bin', '-b']) != 0:
+            if call(['dfu-util', '-a2', '-D', name+'.bin', '-R']) != 0:
                 return
         
         elif command == 'iceprog':
-            if call([iceprog, name+'.bin']) != 0:
+            if call([iceprog, 'fw.bin']) != 0:
                 return
         
         elif command == 'iceread':

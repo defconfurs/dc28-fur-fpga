@@ -1,6 +1,6 @@
 `include "globals.vh"
 
-module test_pattern #(
+module test_intensity #(
   parameter ADDRESS_WIDTH   = 16,
   parameter DATA_WIDTH      = 8,
   parameter DATA_BYTES      = 1,
@@ -20,8 +20,9 @@ module test_pattern #(
   output wire                     cyc_o,
   input wire                      ack_i,
   output wire [2:0]               cti_o,
-  
-  output wire [15:0]               debug
+
+  input wire [3:0]               volume_in,
+  input wire [3:0]               peak_in
   );
 
   wire rst;
@@ -77,11 +78,10 @@ module test_pattern #(
     .completed       ( completed      ),
     .timeout         ( timeout        )
   );
-  assign debug = { payload_in[7:0], start_write, write_busy, completed, timeout };
   
 
   localparam FRAME_DELAY_START = 24'd100;
-  localparam FRAME_TIME        = 24'd600000;
+  localparam FRAME_TIME        = 24'd60000;
   reg [23:0] frame_delay;
   reg        frame_trigger;
   always @(posedge clk or posedge rst) begin
@@ -108,6 +108,7 @@ module test_pattern #(
   localparam colour_green  = 16'h07C0;
   localparam colour_blue   = 16'h001F;
   localparam colour_purple = 16'h7817;
+  localparam colour_grey   = 16'h60DF;
 
   localparam SAVE_STATE_CH_VALUES          = 7'b0000001;
   localparam SAVE_STATE_LATCH_DELAY        = 7'b0000010;
@@ -119,17 +120,12 @@ module test_pattern #(
   reg [6:0] save_state = SAVE_STATE_WAIT;
   reg [6:0] next_save_state;
   
-  reg [5:0] offset = 1;
-  reg [5:0] next_offset;
-
   reg [7:0] row;
   reg [7:0] next_row;
   reg [7:0] col;
   reg [7:0] inv_col;
   reg [7:0] next_col;
   reg [7:0] next_inv_col;
-  reg [4:0] colour;
-  reg [4:0] next_colour;
   reg       mirror;
   reg       next_mirror;
   reg       page;
@@ -140,8 +136,6 @@ module test_pattern #(
     next_row        = row;
     next_col        = col;
     next_inv_col    = inv_col;
-    next_colour     = colour;
-    next_offset     = offset;
     next_payload_in = payload_in;
     next_address    = address;
     next_mirror     = mirror;
@@ -153,24 +147,24 @@ module test_pattern #(
     SAVE_STATE_CH_VALUES: begin
       //if (row == 5 && col == 5) next_payload_in = 16'hFFFF;
       //else                      next_payload_in = 0;
-      case (colour[4:2])
-      3'd0: begin  next_payload_in = colour_red; end
-      3'd1: begin  next_payload_in = colour_orange; end
-      3'd2: begin  next_payload_in = colour_yellow; end
-      3'd3: begin  next_payload_in = colour_green; end
-      3'd4: begin  next_payload_in = colour_blue;  end
-      3'd5: begin  next_payload_in = colour_purple; end
-      default:
-          next_payload_in = 0;
-      endcase
+
+      if (row[3:0] >= 4 && row[3:0] <= 10) begin
+        if (col == (10-peak_in)) next_payload_in = colour_grey;
+        else if (col < (10-volume_in)) next_payload_in = 0;
+        else begin
+          if (col > 6) next_payload_in = colour_green;
+          else if (col > 3) next_payload_in = colour_orange;
+          else next_payload_in = colour_red;
+        end
+      end
+      else next_payload_in = 0;
+      
 
       if (mirror) begin
-        next_address = (FRAME_ADDRESS + 
-                          {5'd0, row[3:0], inv_col[4:0], 1'b0}) + (page ? 16'h0400 : 16'h0000);
+        next_address = (FRAME_ADDRESS + {5'd0, row[3:0], inv_col[4:0], 1'b0}) + (page ? 16'h0400 : 16'h0000);
       end
       else begin
-        next_address = (FRAME_ADDRESS + 
-                          {5'd0, row[3:0], col[4:0], 1'b0}) + (page ? 16'h0400 : 16'h0000);
+        next_address = (FRAME_ADDRESS + {5'd0, row[3:0], col[4:0], 1'b0}) + (page ? 16'h0400 : 16'h0000);
       end
       
       next_save_state = SAVE_STATE_LATCH_DELAY;
@@ -195,28 +189,17 @@ module test_pattern #(
         if (col >= 9) begin
           if (row >= 14) begin
             next_save_state = SAVE_STATE_UPDATE_FB_REQUEST;
-            if (offset >= 8'd22)
-                next_offset = 0;
-            else
-                next_offset = offset + 2;
           end
           else begin
             next_col = 0;
             next_inv_col = 19;
             next_row = row + 1;
-
-            if (offset + row >= 24)
-                next_colour = offset + row - 24;
-            else 
-                next_colour = offset + row;
           end
         end
         else begin
           next_col = col + 1;
           next_inv_col = inv_col - 1;
 
-          if (colour < (5'd24)) next_colour = colour + 1;
-          else                  next_colour = 0;
         end
       end
     end
@@ -240,7 +223,6 @@ module test_pattern #(
       next_row    = 0;
       next_col    = 0;
       next_inv_col = 19;
-      next_colour = offset;
 
       if (frame_trigger) next_save_state = SAVE_STATE_CH_VALUES;
     end
@@ -257,8 +239,6 @@ module test_pattern #(
       col        <= 0;
       inv_col    <= 19;
       address    <= 0;
-      colour     <= 0;
-      offset     <= 0;
       payload_in <= 0;
       address    <= BASE_ADDRESS;
       mirror     <= 0;
@@ -270,8 +250,6 @@ module test_pattern #(
       col        <= next_col;
       inv_col    <= next_inv_col;
       address    <= next_address;
-      colour     <= next_colour;
-      offset     <= next_offset;
       payload_in <= next_payload_in;
       address    <= next_address;
       mirror     <= next_mirror;

@@ -22,13 +22,7 @@ module wishbone_memory #(
     input wire [2:0]               cti_i
     );
 
-    localparam MEMORY_SIZE_I  = (MEMORY_SIZE <=  512 ? 9 :
-                                 MEMORY_SIZE <= 1024 ? 10 :
-                                 MEMORY_SIZE <= 2048 ? 11 : 
-                                 MEMORY_SIZE <= 4096 ? 12 :
-                                 MEMORY_SIZE <= 8192 ? 13 :
-                                 MEMORY_SIZE <= 16384 ? 14 :
-                                 MEMORY_SIZE <= 32768 ? 15 : 16);
+    localparam MEMORY_SIZE_I  = $clog2(MEMORY_SIZE);
     
     wire [ADDRESS_WIDTH-1:0] local_address;
     wire                     valid_address;
@@ -46,8 +40,8 @@ module wishbone_memory #(
                 .address ( local_address[14:0] ),
                 .din     ( dat_i ),
                 .dout    ( dat_o ),
-                .we      ( cyc_i & valid_address & we_i ),
-                .sleep   ( ~(cyc_i & valid_address) )
+                .we      ( stb_i & valid_address & we_i ),
+                .sleep   ( ~(stb_i & valid_address) )
             );
         end
         else begin
@@ -59,12 +53,78 @@ module wishbone_memory #(
                 .address ( local_address[MEMORY_SIZE_I-1:0] ),
                 .din     ( dat_i ),
                 .dout    ( dat_o ),
-                .we      ( cyc_i & valid_address & we_i )
+                .we      ( stb_i & valid_address & we_i )
             );
         end
     endgenerate
-    
 endmodule
+
+
+
+
+module wishbone_spram #(
+    parameter ADDRESS_WIDTH = 16,
+    parameter DATA_WIDTH = 8,
+    parameter DATA_BYTES = 1,
+    parameter BASE_ADDRESS = 0
+)  (
+    // Wishbone interface
+    input wire                     rst_i,
+    input wire                     clk_i,
+
+    input wire [ADDRESS_WIDTH-1:0] adr_i,
+    input wire [DATA_WIDTH-1:0]    dat_i,
+    output wire [DATA_WIDTH-1:0]   dat_o,
+    input wire                     we_i,
+    input wire [DATA_BYTES-1:0]    sel_i,
+    input wire                     stb_i,
+    input wire                     cyc_i,
+    output reg                     ack_o,
+    input wire [2:0]               cti_i
+  );
+
+  
+
+  
+  wire [ADDRESS_WIDTH-1:0] local_address;
+  wire                     valid_address;
+  assign local_address = adr_i - BASE_ADDRESS;
+  assign valid_address = local_address < 16'h4000;
+
+  reg [14:0]               latched_address;
+
+  always @(posedge clk_i) begin
+    ack_o <= cyc_i & valid_address;
+    latched_address <= adr_i;
+  end
+
+  wire [1:0] wen;
+  wire [15:0] dat_16;
+  assign wen = (stb_i & valid_address & we_i) ? { adr_i[0], ~adr_i[0] } : 2'b00;
+  
+  assign dat_o = latched_address[0] ? dat_16[15:8] : dat_16[7:0];
+
+  SB_SPRAM256KA ram00
+  (
+    .ADDRESS    (local_address[14:1]),
+    .DATAIN     ({dat_i,dat_i}),
+    .MASKWREN   ({wen[1], wen[1], wen[0], wen[0]}),
+    .WREN       ((stb_i & valid_address & we_i)),
+    .CHIPSELECT (1),
+    .CLOCK      (clk_i),
+    .STANDBY    (1'b0),
+    .SLEEP      (1'b0),
+    .POWEROFF   (1'b1),
+    .DATAOUT    (dat_16)
+  );
+  
+endmodule
+
+
+
+
+
+
 
 module simple_spram_8 #(
 )  (
@@ -84,21 +144,21 @@ module simple_spram_8 #(
 
     wire              upper_byte;
     wire              lower_byte;
-    assign upper_byte = we & address[0];
-    assign lower_byte = we & ~address[0];
+    assign upper_byte =  address[0];
+    assign lower_byte = ~address[0];
     assign maskwren = { upper_byte, upper_byte, lower_byte, lower_byte };
     
     SB_SPRAM256KA ramfn_inst1(
         .CLOCK      ( clk ),
         .STANDBY    ( 0 ),
-        .SLEEP      ( sleep ),
+        .SLEEP      ( 0 ),
         .POWEROFF   ( 0 ),
 
         .ADDRESS    ( address[14:1] ),
         .DATAIN     ( write_port ),
         .MASKWREN   ( maskwren ),
         .WREN       ( we ),
-        .CHIPSELECT ( 1 ),
+        .CHIPSELECT ( ~sleep ),
         .DATAOUT    ( read_port )
     );
 

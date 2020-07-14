@@ -37,3 +37,4 @@ set_io --warn-no-port pin_usbp 25
 set_io --warn-no-port pin_usbn 23
 set_io --warn-no-port pin_pu   27
 
+set_io --warn-no-port pin_clk_out 40

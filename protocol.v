@@ -16,7 +16,6 @@ module protocol #(
     // Wishbone interface
     input wire                      rst_i,
     input wire                      clk_i,
-    input wire                      clk_48mhz,
 
     output wire [ADDRESS_WIDTH-1:0] adr_o,
     input wire [DATA_WIDTH-1:0]     dat_i,
@@ -132,8 +131,10 @@ module protocol #(
     reg [ADDRESS_WIDTH-1:0]      next_transfer_address;
     reg [DATA_WIDTH-1:0]         next_data_out [0:MAX_PAYLOAD-1];
     reg [INTERFACE_LENGTH_N-1:0] next_payload_length;
-    
-    always @(posedge clk_48mhz or posedge rst_i) begin
+
+
+  
+    always @(posedge clk_i or posedge rst_i) begin
         if (rst_i) begin
             state            <= STATE_RX_MARK;
             ascii_mode       <= 1'b0;
@@ -155,7 +156,7 @@ module protocol #(
     end
     generate
         for (i = 0; i < MAX_PAYLOAD; i = i+1) begin
-            always @(posedge clk_48mhz or posedge rst_i) begin
+            always @(posedge clk_i or posedge rst_i) begin
                 if (rst_i) data_out[i] <= 8'd0;
                 else       data_out[i] <= next_data_out[i];
             end

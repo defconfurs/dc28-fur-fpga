@@ -1,0 +1,109 @@
+[
+    {
+        "image":"images/frame_0.png",
+        "transitions":{
+            "frames":{"value":10, "next":1},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_1.png",
+        "transitions":{
+            "frames":{"value":10, "next":2},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_2.png",
+        "transitions":{
+            "frames":{"value":10, "next":3},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_3.png",
+        "transitions":{
+            "frames":{"value":10, "next":4},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_4.png",
+        "transitions":{
+            "frames":{"value":10, "next":5},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_5.png",
+        "transitions":{
+            "frames":{"value":10, "next":6},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_6.png",
+        "transitions":{
+            "frames":{"value":10, "next":7},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_7.png",
+        "transitions":{
+            "frames":{"value":10, "next":8},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_8.png",
+        "transitions":{
+            "frames":{"value":10, "next":9},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_9.png",
+        "transitions":{
+            "frames":{"value":10, "next":10},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_10.png",
+        "transitions":{
+            "frames":{"value":10, "next":11},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_11.png",
+        "transitions":{
+            "frames":{"value":10, "next":12},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_12.png",
+        "transitions":{
+            "frames":{"value":10, "next":13},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_13.png",
+        "transitions":{
+            "frames":{"value":10, "next":0},
+            "boop":  {"value":0,  "next":14}
+        }
+    },
+    {
+        "image":"images/frame_14.png",
+        "transitions":{
+            "frames":{"value":100, "next":0}
+        }
+    }
+    
+]
+        
+            
