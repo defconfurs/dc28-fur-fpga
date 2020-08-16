@@ -34,8 +34,9 @@ module spi_interface #(
   assign rst = rst_i;
 
   localparam ADDR_WIDTH = 8;
+  localparam REG_ADDR_SIZE = 4;
 
-  reg memory_busy;
+  reg mem_busy;
 
 
   reg [ADDR_WIDTH-1:0]  raminst_address;
@@ -43,9 +44,9 @@ module spi_interface #(
   wire [31:0]           raminst_data_out;
   reg                   raminst_we;
 
-  reg [ADDR_WIDTH-1:0]  ram_address;
-  reg [31:0]            ram_data_in;
-  wire [31:0]           ram_data_out;
+  wire [ADDR_WIDTH-1:0] ram_address;
+  wire [31:0]           ram_data_in;
+  reg [31:0]            ram_data_out;
   reg                   ram_we;
 
   
@@ -57,15 +58,15 @@ module spi_interface #(
   wire [ADDRESS_WIDTH-1:0] base_address     = BASE_ADDRESS;
   wire [ADDRESS_WIDTH-1:0] mem_base_address = MEM_ADDRESS;
 
-  wire                     valid_reg_bank = (adr_i == base_address[ADDRESS_WIDTH-1:REG_ADDR_SIZE]);
-  wire                     valid_mem_bank = (adr_i == mem_base_address[ADDRESS_WIDTH-1:ADDR_WIDTH]);
+  wire                     valid_reg_bank = (adr_i[ADDRESS_WIDTH-1:REG_ADDR_SIZE] == base_address[ADDRESS_WIDTH-1:REG_ADDR_SIZE]);
+  wire                     valid_mem_bank = (adr_i[ADDRESS_WIDTH-1:ADDR_WIDTH] == mem_base_address[ADDRESS_WIDTH-1:ADDR_WIDTH]);
 
   assign local_address = adr_i[REG_ADDR_SIZE-1:0];
-  assign valid_address = (valid_reg_bank && valid_reg_address) || valid_mem_bank;
+  assign valid_address = valid_reg_bank || valid_mem_bank;
   wire                     masked_cyc;
   assign masked_cyc = (valid_address & cyc_i);
   always @(posedge clk_i) begin
-    ack_o <= cyc_i & valid_address;
+    ack_o <= cyc_i & valid_address & (valid_reg_bank ? valid_reg_address : 1);
   end
 
   always @(*) begin
@@ -158,7 +159,7 @@ module spi_interface #(
 
   localparam EXTRA_BITS = $clog2(CLOCKS_PER_WORD);
   reg [ADDR_WIDTH+EXTRA_BITS-1:0] word_count;
-  reg [26:0] next_word_count;
+  reg [ADDR_WIDTH+EXTRA_BITS-1:0] next_word_count;
   reg [ADDR_WIDTH+1-1:0] latched_read_length;
   always @(posedge clk) if (!mem_busy) latched_read_length <= read_length;
   
@@ -168,8 +169,8 @@ module spi_interface #(
   reg [HEADER_LENGTH-1:0] header;
   reg [HEADER_LENGTH-1:0] next_header;
   
-  reg [31:0] word_buffer;
-  reg [31:0] next_word_buffer;
+  reg [DATA_WIDTH-1:0] word_buffer;
+  reg [DATA_WIDTH-1:0] next_word_buffer;
   
   always @(posedge clk or posedge rst) begin
     if (rst) begin
@@ -261,7 +262,7 @@ module spi_interface #(
       if (word_count[ADDR_WIDTH+EXTRA_BITS-1:EXTRA_BITS] < latched_read_length) begin
         next_word_count = word_count + 1;
         
-        if (next_word_count[26:3] != word_count[26:3]) ram_we = 1;
+        if (next_word_count[ADDR_WIDTH+EXTRA_BITS-1:EXTRA_BITS] != word_count[ADDR_WIDTH+EXTRA_BITS-1:EXTRA_BITS]) ram_we = 1;
       end
       else begin
         next_state = STATE_IDLE;
@@ -273,10 +274,6 @@ module spi_interface #(
     endcase
   end
 
-  //reg [ADDR_WIDTH-1:0] ram_address;
-  //reg [7:0]            ram_data_in;
-  //wire [7:0]           ram_data_out;
-  //reg                  ram_we;
   assign ram_data_in = word_buffer;
   assign ram_address = word_count[ADDR_WIDTH+EXTRA_BITS-1:EXTRA_BITS];
   

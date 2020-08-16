@@ -20,3 +20,8 @@
 `define VIDMEM_READ_ADDR   ('h02) /* 2 byte */
 `define VIDMEM_READ_LENGTH ('h04) /* 2 byte */
 `define VIDMEM_SAVE_ADDR   ('h06) /* 2 byte */
+
+
+`define SPIMEM_CONTROL     ('h00)
+`define SPIMEM_READ_ADDR   ('h01)
+`define SPIMEM_READ_LENGTH ('h02)
