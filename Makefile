@@ -7,7 +7,7 @@ PIN_DEF = top.pcf
 DEVICE = up5k
 PACKAGE = sg48
 
-RTL_USB_DIR = tinydfu-bootloader/usb/
+RTL_USB_DIR = usb/
 RTL_USB_SRCS = \
 	$(RTL_USB_DIR)/edge_detect.v \
 	$(RTL_USB_DIR)/strobe.v \
@@ -20,8 +20,7 @@ RTL_USB_SRCS = \
 	$(RTL_USB_DIR)/usb_fs_tx_mux.v \
 	$(RTL_USB_DIR)/usb_fs_tx.v \
 	$(RTL_USB_DIR)/usb_reset_det.v \
-	$(RTL_USB_DIR)/usb_dfu_ctrl_ep.v \
-	$(RTL_USB_DIR)/usb_spiflash_bridge.v \
+	$(RTL_USB_DIR)/usb_dfu_app_ep.v \
 	$(RTL_USB_DIR)/usb_dfu_core.v \
 	$(RTL_USB_DIR)/usb_phy_ice40.v
 
@@ -78,6 +77,9 @@ all: bootloader
 .DEFAULT_GOAL = all
 .SECONDARY:
 .PHONY: all prog clean
+
+prog: multiboot.bin
+	iceprog -p $<
 
 all: $(TARGETS)
 

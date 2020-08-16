@@ -55,7 +55,7 @@ tinydfu.json: $(RTL_USB_SRCS) tinydfu_pll.v
 tinydfu.asc: $(PIN_DEF)
 
 tinydfu_pll.v:
-	icepll -i 16 -o 48 -m -f $@
+	icepll -i 24 -o 48 -m -f $@
 
 TARGETS += tinydfu.bin
 

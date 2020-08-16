@@ -31,9 +31,5 @@ module usb_fs_in_arb #(
         grant = 1;
       end
     end
-
-    // if (!grant) begin
-    //    arb_in_ep_data <= 0;
-    // end
   end
 endmodule

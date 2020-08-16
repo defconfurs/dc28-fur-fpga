@@ -85,6 +85,7 @@ module top (
   localparam DFU_STATE_dfuUPLOAD_IDLE         = 'h09;
   localparam DFU_STATE_dfuERROR               = 'h0a;
 
+  wire dfu_detach;
   wire [7:0] dfu_state;
   assign dfu_idle = (dfu_state == DFU_STATE_appIDLE   ||
                      dfu_state == DFU_STATE_appDETACH ||
@@ -466,13 +467,8 @@ module top (
     .usb_n_rx  (usb_n_rx),
     .usb_tx_en (usb_tx_en),
 
-    // SPI pins
-    .spi_csel  (dfu_cs),
-    .spi_clk   (dfu_sck),
-    .spi_miso  (dfu_miso),
-    .spi_mosi  (dfu_mosi),
-
      // DFU state and debug
+    .dfu_detach(dfu_detach),
     .dfu_state (dfu_state),
     .debug     ()
   );
@@ -788,10 +784,13 @@ module top (
   always @(posedge clk) usb_reset <= usb_reset_unreg;
   
 
+  // Image Slot 0: Multiboot header and POR springboard.
+  // Image Slot 1: DFU Bootloader
+  // Image Slot 2: This Image (User Application).
   SB_WARMBOOT warmboot_inst (
     .S1(1'b0),
-    .S0(1'b0), // was 1
-    .BOOT(usb_reset && dfu_state == DFU_STATE_appDETACH)
+    .S0(1'b1),
+    .BOOT(dfu_detach)
   );
 
 endmodule
