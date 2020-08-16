@@ -130,6 +130,7 @@ module test_intensity #(
   reg       next_mirror;
   reg       page;
   reg       next_page;
+  reg [3:0] row_num_thing;
 
   always @(*) begin
     next_save_state = save_state;
@@ -145,19 +146,36 @@ module test_intensity #(
                
     case (save_state)
     SAVE_STATE_CH_VALUES: begin
+      row_num_thing = ((row ==  0) ? 15 :
+                       (row ==  1) ? 14 :
+                       (row ==  2) ? 13 :
+                       (row ==  3) ? 12 :
+                       (row ==  4) ? 11 :
+                       (row ==  5) ? 10 :
+                       (row ==  6) ?  9 :
+                       (row ==  7) ? 10 :
+                       (row ==  8) ? 11 :
+                       (row ==  9) ? 12 :
+                       (row == 10) ? 13 :
+                       (row == 11) ? 14 :
+                       (row == 12) ? 15 :
+                       15);
+      
       //if (row == 5 && col == 5) next_payload_in = 16'hFFFF;
       //else                      next_payload_in = 0;
 
-      if (row[3:0] >= 4 && row[3:0] <= 10) begin
-        if (col == (10-peak_in)) next_payload_in = colour_grey;
-        else if (col < (10-volume_in)) next_payload_in = 0;
-        else begin
-          if (col > 6) next_payload_in = colour_green;
-          else if (col > 3) next_payload_in = colour_orange;
-          else next_payload_in = colour_red;
-        end
+      //if (row[3:0] >= 4 && row[3:0] <= 10) begin
+      //if (col == (10-peak_in)) next_payload_in = colour_grey;
+      //else
+      if (row > 12) next_payload_in = 0;
+      else if (col < (row_num_thing-volume_in)) next_payload_in = 0;
+      else begin
+        if (col > 6) next_payload_in = colour_green;
+        else if (col > 3) next_payload_in = colour_orange;
+        else next_payload_in = colour_red;
       end
-      else next_payload_in = 0;
+      //end
+      //else next_payload_in = 0;
       
 
       if (mirror) begin

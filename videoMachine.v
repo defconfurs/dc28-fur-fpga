@@ -5,7 +5,7 @@ module video_machine #(
   parameter ADDRESS_WIDTH       = 16,
   parameter DATA_WIDTH          = 8,
   parameter DATA_BYTES          = 1,
-  parameter MAX_WAIT            = 8,
+  parameter MAX_WAIT            = 16,
   parameter LED_MATRIX_ADDR     = `MATRIX_START,
   parameter LED_MATRIX_REG_ADDR = `MATRIX_ADDR_L,
   parameter BASE_FRAME_ADDR     = `FRAME_MEMORY_START + 1024,
@@ -31,7 +31,7 @@ module video_machine #(
 
   input wire [3:0]                volume_in,
   
-  output wire [7:0]               debug
+  output wire [15:0]               debug
   );
 
   wire rst;
@@ -89,7 +89,7 @@ module video_machine #(
     .completed       ( completed      ),
     .timeout         ( timeout        )
   );
-  assign debug = { payload_in[7:0], start_write, write_busy, completed, timeout };
+  assign debug = { payload_in[7:0], start_write, write_busy, completed, timeout, 1'b0 };
 
 
   localparam MS_PERIOD = CLOCK_MHZ * 1000;

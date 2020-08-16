@@ -77,11 +77,11 @@ module test_pattern #(
     .completed       ( completed      ),
     .timeout         ( timeout        )
   );
-  assign debug = { payload_in[7:0], start_write, write_busy, completed, timeout };
+  assign debug = { payload_in[7:0], start_write, write_busy, completed, timeout, 1'b0 };
   
 
   localparam FRAME_DELAY_START = 24'd100;
-  localparam FRAME_TIME        = 24'd600000;
+  localparam FRAME_TIME        = 24'd1200000;
   reg [23:0] frame_delay;
   reg        frame_trigger;
   always @(posedge clk or posedge rst) begin

@@ -90,7 +90,7 @@ def main():
                 return
             if call([icepack, name+'.asc', name+'.bin']) != 0:
                 return
-            if call([icemulti, "-v", "-o", "fw.bin", "-p0", "-A12", "-a12", name+'.bin']) != 0:
+            if call([icemulti, "-v", "-o", "fw.bin", "-p0", "-A12", name+'.bin', 'empty.bit']) != 0:
                 return
             
             
@@ -99,11 +99,13 @@ def main():
                 return
         
         elif command == 'iceprog':
+            if call([icemulti, "-v", "-o", "fw.bin", "-p0", "-A12", name+'.bin', 'empty.bit']) != 0:
+                return
             if call([iceprog, 'fw.bin']) != 0:
                 return
         
         elif command == 'iceread':
-            if call([iceprog, '-r', name+'.bin_readout']) != 0:
+            if call([iceprog, '-R', "1M", name+'.bin_readout']) != 0:
                 return
         
         elif command == 'iceproghelp':

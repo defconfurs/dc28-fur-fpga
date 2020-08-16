@@ -194,8 +194,8 @@ module video_memory #(
       byte_buffer <= 0;
     end
     else begin
-      state      <= next_state;
-      byte_count <= next_byte_count;
+      state       <= next_state;
+      byte_count  <= next_byte_count;
       local_state <= next_local_state;
       header      <= next_header;
       byte_buffer <= next_byte_buffer;

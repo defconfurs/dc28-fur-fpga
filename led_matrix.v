@@ -365,9 +365,6 @@ module led_matrix #(
             load_state <= LOAD_STATE_START_REQUEST;
             load_timer <= TOTAL_LOAD_TIME;
             col_timer  <= TOTAL_LINE_TIME;
-
-            // this is outside just to maximize the time this signal's high
-            if (current_col >= N_COLS-1) frame_complete <= 1;
             
             if (current_field == FIELD_BLUE) begin
               if (current_col < N_COLS-1) begin
@@ -376,6 +373,7 @@ module led_matrix #(
               else begin
                 current_col           <= 0;
                 latched_frame_address <= frame_address;
+                frame_complete        <= 1;
               end
             end
           end
