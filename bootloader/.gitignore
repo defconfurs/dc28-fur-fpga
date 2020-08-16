@@ -1,0 +1,5 @@
+*.json
+*.asc
+*.rpt
+*.bin
+tinydfu_pll.v

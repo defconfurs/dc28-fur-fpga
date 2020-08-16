@@ -1,11 +1,6 @@
-*.gtkw
-*_Implmnt/
-stdout.log
-synlog.tcl
-*~
-*.swp
-*bak
-gerbers/
-build/
-*.pyc
-OLD
+*.json
+*.asc
+*.rpt
+*.bin
+brightness_lut_rom.txt
+filter_bank_mem.txt

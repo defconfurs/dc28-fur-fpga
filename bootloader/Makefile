@@ -1,13 +1,12 @@
 ##
-## Make and program DC28 Fur Badge
+## Make and program TinyFPGA BX
 ##
-TARGETNAME = dc28-fur-fpga
-PROJTOP = top
-PIN_DEF = top.pcf
+PIN_DEF = ../top.pcf
 DEVICE = up5k
 PACKAGE = sg48
+TARGETS = 
 
-RTL_USB_DIR = tinydfu-bootloader/usb/
+RTL_USB_DIR = ../tinydfu-bootloader/usb/
 RTL_USB_SRCS = \
 	$(RTL_USB_DIR)/edge_detect.v \
 	$(RTL_USB_DIR)/strobe.v \
@@ -33,7 +32,7 @@ RTL_USB_SRCS = \
 
 %.asc: %.json
 	nextpnr-ice40 --$(DEVICE) --package $(PACKAGE) \
-		--pcf $(filter %.pcf, $^) --opt-timing \
+		--pcf $(PIN_DEF) --opt-timing \
 		--json $(filter %.json, $^) --asc $@
 
 %.bin: %.asc
@@ -43,45 +42,32 @@ RTL_USB_SRCS = \
 	icetime -d $(DEVICE) -mtr $@ $<
 
 #############################
-## Badge Application Image
+## First Stage Bootloader
 #############################
-top.asc: $(PIN_DEF)
-top.json: $(RTL_USB_SRCS) $(wildcard *.v)
-top.json: brightness_lut_rom.txt filter_bank_mem.txt
+firstboot.asc: $(PIN_DEF)
 
-TARGETS += top.bin
-
-# Generated file contents.
-brightness_lut_rom.txt filter_bank_mem.txt &: generate_luts.py
-	python3 generate_luts.py
+TARGETS += firstboot.bin
 
 #############################
-## Bootloaders
+## Second Stage TinyDFU
 #############################
-bootloader/firstboot.bin: bootloader
-bootloader/tinydfu.bin: bootloader
+tinydfu.json: $(RTL_USB_SRCS) tinydfu_pll.v
+tinydfu.asc: $(PIN_DEF)
 
-bootloader:
-	make -C bootloader
+tinydfu_pll.v:
+	icepll -i 16 -o 48 -m -f $@
 
-multiboot.bin: bootloader/firstboot.bin bootloader/tinydfu.bin top.bin
-	icemulti -v -o $@ -a15 -p0 $^
-
-TARGETS += multiboot.bin
-
-all: bootloader
-.PHONY: bootloader
+TARGETS += tinydfu.bin
 
 #############################
 ## Common Make Targets
 #############################
 .DEFAULT_GOAL = all
 .SECONDARY:
-.PHONY: all prog clean
+.PHONY: all clean
 
 all: $(TARGETS)
 
 clean:
-	make -C bootloader clean
 	rm -f $(TARGETS) $(TARGETS:.bin=.json) $(TARGETS:.bin=.asc) $(TARGETS:.bin=.rpt)
-	rm -f brightness_lut_rom.txt filter_bank_mem.txt
+	rm -f tinydfu_pll.v
