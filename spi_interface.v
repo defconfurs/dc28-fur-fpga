@@ -107,7 +107,7 @@ module spi_interface #(
     reg_data          = 0;
     if (masked_cyc) begin 
       case (local_address)
-      `SPIMEM_CONTROL       : begin valid_reg_address = 1; reg_data = {31'd0, mem_busy | start_read}; end
+      `SPIMEM_CONTROL       : begin valid_reg_address = 1; reg_data = {30'd0, mem_busy, mem_busy | start_read}; end
       `SPIMEM_READ_ADDR     : begin valid_reg_address = 1; reg_data = read_addr; end
       `SPIMEM_READ_LENGTH   : begin valid_reg_address = 1; reg_data = read_length; end
       endcase
@@ -123,7 +123,7 @@ module spi_interface #(
       ram_data_out    = raminst_data_out;
     end
     else begin
-      raminst_we      = (stb_i & valid_address & we_i);
+      raminst_we      = (stb_i & valid_mem_bank & we_i);
       raminst_data_in = dat_i;
       raminst_address = local_address;
       ram_data_out    = 0;
