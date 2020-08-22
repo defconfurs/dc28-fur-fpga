@@ -92,8 +92,8 @@ def main():
                 return
 
             # make multiboot.bin
-            if call([icemulti, "-v", "-o", "multiboot.bin", "-p0", "-A15", 'firstboot.bin', 'bootloader/tinydfu.bin', 'top.bin']) != 0:
-                return
+            #if call([icemulti, "-v", "-o", "multiboot.bin", "-p0", "-A15", 'firstboot.bin', 'bootloader/tinydfu.bin', 'top.bin']) != 0:
+            #    return
 
 
             
@@ -102,9 +102,7 @@ def main():
                 return
         
         elif command == 'iceprog':
-            if call([icemulti, "-v", "-o", "fw.bin", "-p0", "-A12", name+'.bin', 'empty.bit']) != 0:
-                return
-            if call([iceprog, 'fw.bin']) != 0:
+            if call([iceprog, 'top.bin']) != 0:
                 return
         
         elif command == 'iceread':

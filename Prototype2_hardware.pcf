@@ -1,0 +1,53 @@
+###############################################################################
+# Family & Device:    iCE40UP5K
+# Package:            SG48
+###############################################################################
+
+set_io pin_clk 20
+
+set_io pin_col_first   32
+set_io pin_col_advance 28
+
+set_io pin_row_oe_n  2
+set_io pin_row_bank0 37
+set_io pin_row_bank1 36
+set_io pin_row_bank2 35
+set_io pin_row_bank3 34
+
+set_io pin_rclk 31
+set_io pin_r0a  38
+set_io pin_r0b  42
+set_io pin_r1a  43
+set_io pin_r1b  44
+set_io pin_r2a  45
+set_io pin_r2b  46
+set_io pin_r3a  47
+set_io pin_r3b  48
+
+set_io pin_mic_data 9
+set_io pin_mic_clk  10
+
+set_io pin_miso 17
+set_io pin_cs   16
+set_io pin_mosi 14
+set_io pin_sck  15
+set_io pin_wp   18
+set_io pin_hold 13
+
+set_io pin_usbp 25
+set_io pin_usbn 23
+set_io pin_pu   26
+
+set_io pin_stat_r 39
+set_io pin_stat_g 40
+set_io pin_stat_b 41
+
+set_io pin_button_up 11
+set_io pin_button_down 12
+
+set_io pin_iob_13b 6
+set_io pin_iob_23b 21
+set_io pin_iob_29b 19
+set_io pin_iob_8a  4
+set_io pin_iob_9b  3
+set_io pin_iot_38b 27
