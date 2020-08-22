@@ -27,6 +27,8 @@ def main():
 
     # Name of the Verilog source file *without* the ".v" extension
     name = 'top'
+
+    pcf_file = "Prototype2_hardware.pcf"
     
     # Platform-specific path to IceStorm tools
     if os.name=='nt':
@@ -64,21 +66,19 @@ def main():
         tinyprog      = 'tinyprog'
 
     sources = glob('*.v')
-    sources += ["tinydfu-bootloader/usb/edge_detect.v",
-                "tinydfu-bootloader/usb/strobe.v",
-                "tinydfu-bootloader/usb/usb_fs_in_arb.v",
-                "tinydfu-bootloader/usb/usb_fs_in_pe.v",
-                "tinydfu-bootloader/usb/usb_fs_out_arb.v",
-                "tinydfu-bootloader/usb/usb_fs_out_pe.v",
-                "tinydfu-bootloader/usb/usb_fs_pe.v",
-                "tinydfu-bootloader/usb/usb_fs_rx.v",
-                "tinydfu-bootloader/usb/usb_fs_tx_mux.v",
-                "tinydfu-bootloader/usb/usb_fs_tx.v",
-                "tinydfu-bootloader/usb/usb_reset_det.v",
-                "tinydfu-bootloader/usb/usb_dfu_ctrl_ep.v",
-                "tinydfu-bootloader/usb/usb_spiflash_bridge.v",
-                "tinydfu-bootloader/usb/usb_dfu_core.v"]
-    #glob('./usb/*.v')
+    sources += ["usb/edge_detect.v",
+                "usb/strobe.v",
+                "usb/usb_fs_in_arb.v",
+                "usb/usb_fs_in_pe.v",
+                "usb/usb_fs_out_arb.v",
+                "usb/usb_fs_out_pe.v",
+                "usb/usb_fs_pe.v",
+                "usb/usb_fs_rx.v",
+                "usb/usb_fs_tx_mux.v",
+                "usb/usb_fs_tx.v",
+                "usb/usb_dfu_app_ep.v",
+                "usb/usb_dfu_core.v",
+                "usb/usb_phy_ice40.v"]
 
     for command in commands:
         # run command
@@ -86,13 +86,16 @@ def main():
             synth_cmd = 'synth_ice40 -top top -json ' + name + '.json'
             if call([yosys, '-q', '-p', synth_cmd] + sources) != 0:
                 return
-            if call([nextpnr_ice40, '--up5k', '--package', 'sg48', '--opt-timing', '--pcf', name+'.pcf', '--json', name+'.json', '--asc', name+'.asc']) != 0:
+            if call([nextpnr_ice40, '--up5k', '--package', 'sg48', '--opt-timing', '--pcf', pcf_file, '--json', name+'.json', '--asc', name+'.asc']) != 0:
                 return
-            if call([icepack, name+'.asc', name+'.bin']) != 0:
+            if call([icepack, name+'.asc', 'top.bin']) != 0:
                 return
-            if call([icemulti, "-v", "-o", "fw.bin", "-p0", "-A12", name+'.bin', 'empty.bit']) != 0:
+
+            # make multiboot.bin
+            if call([icemulti, "-v", "-o", "multiboot.bin", "-p0", "-A15", 'firstboot.bin', 'bootloader/tinydfu.bin', 'top.bin']) != 0:
                 return
-            
+
+
             
         elif command == 'upload':
             if call(['dfu-util', '-a2', '-D', name+'.bin', '-R']) != 0:

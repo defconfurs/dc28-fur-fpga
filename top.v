@@ -27,14 +27,29 @@ module top (
     input wire  pin_mic_data,
     output wire pin_mic_clk,
     
-    output wire pin_fpga_int,
-    
     inout wire  pin_miso,
     inout wire  pin_mosi,
+    inout wire  pin_wp,
+    inout wire  pin_hold,
     output wire pin_cs,
-    output wire pin_sck
+    output wire pin_sck,
+
+    input wire  pin_button_up,
+    input wire  pin_button_down,
+
+    // addon header
+    //                            GND        
+    input wire pin_iob_9b, //  pin 3
+    input wire pin_iob_8a, //  pin 4
+    input wire pin_iob_13b, // pin 6
+    //                           +3.3V
+
+    input wire pin_iot_38b, // pin 27
+    input wire pin_iob_29b, // pin 19
+    input wire pin_iob_23b  // pin 21
   );
 
+  
   wire [15:0]   debug;
     
   wire [3:0]    latch_row_bank;
@@ -58,9 +73,9 @@ module top (
   assign pin_r1b         = row_data[3];
   assign pin_r2a         = row_data[4];
   assign pin_r2b         = row_data[5];
+
   assign pin_r3a         = row_data[6];
   assign pin_r3b         = row_data[7];
-
 
 
   wire mem_busy;
@@ -68,7 +83,6 @@ module top (
   wire dfu_idle;
   wire dfu_usb_to_flash;
   wire dfu_flash_to_usb;
-  reg usb_reset;
 
   wire flash_busy;
   assign flash_busy = mem_busy | dfu_busy;
@@ -112,7 +126,7 @@ module top (
   wire clk_locked;
   SB_PLL40_CORE #(
       .DIVR(4'd0),
-      .DIVF(7'd31), // was 47 - 7'b0101111 = 0x2F
+      .DIVF(7'd63), // was 47 - 7'b0101111 = 0x2F (31 for first prototype)
       .DIVQ(3'd4),
       .FILTER_RANGE(3'd1),
       .FEEDBACK_PATH("SIMPLE"),
@@ -136,7 +150,7 @@ module top (
       .SDO(),
       .SCLK()
   );
-  wire          lf_clk;
+  wire lf_clk;
   SB_LFOSC LF_OscInst (
     .CLKLFPU (1),
     .CLKLFEN (1),
@@ -187,8 +201,6 @@ module top (
   assign clk = clk_12mhz;
   assign rst = reset;
   
-  //assign pin_fpga_int     = clk_48mhz;
-  //assign pin_fpga_int = clk_12mhz;
   
   //---------------------------------------------------------------
   // Wishbone arbitration connections
@@ -264,40 +276,20 @@ module top (
   wire       mem_spi_sck;
   wire       mem_spi_cs;
   wire [3:0] mem_spi_d_out;
-  reg [3:0]  mem_spi_d_in;
+  wire [3:0] mem_spi_d_in;
   wire [3:0] mem_spi_d_dir;
 
-  reg  dfu_miso;
-  wire dfu_cs;
-  wire dfu_mosi;
-  wire dfu_sck;
-
   wire [3:0] spi_d_in;
-  reg [3:0]  spi_d_out;
-  reg [3:0]  spi_d_dir;
-  reg        spi_sck;
-  reg        spi_cs;
+  wire [3:0] spi_d_out;
+  wire [3:0] spi_d_dir;
+  wire       spi_sck;
+  wire       spi_cs;
 
-  always @(*) begin
-    if (dfu_busy) begin
-      spi_sck      = dfu_sck;
-      spi_cs       = dfu_cs;
-      spi_d_out    = {3'd0, dfu_mosi};
-      spi_d_dir    = { 4'b0001 };
-      dfu_miso     = spi_d_in[1];
-
-      mem_spi_d_in = 4'd0;
-    end
-    else begin
-      spi_sck      = mem_spi_sck;
-      spi_cs       = mem_spi_cs;
-      spi_d_out    = mem_spi_d_out;
-      spi_d_dir    = mem_spi_d_dir;
-      mem_spi_d_in = spi_d_in;
-
-      dfu_miso     = 0;
-    end
-  end
+  assign spi_sck      = mem_spi_sck;
+  assign spi_cs       = mem_spi_cs;
+  assign spi_d_out    = mem_spi_d_out;
+  assign spi_d_dir    = mem_spi_d_dir;
+  assign mem_spi_d_in = spi_d_in;
 
   assign pin_cs  = spi_cs;
   assign pin_sck = spi_sck;
@@ -772,17 +764,6 @@ module top (
   //  if (!(dfu_state == DFU_STATE_appIDLE || dfu_state == DFU_STATE_dfuIDLE)) reset_armed = 1;
   //end
 
-  wire usb_reset_unreg;
-  usb_reset_det #(
-    .IN_CLK_MHZ ( 12 )
-  ) rst_detector (
-    .clk(clk_12mhz),
-    .reset(usb_reset_unreg),
-    .usb_p_rx(usb_p_in),
-    .usb_n_rx(usb_n_in),
-  );
-  always @(posedge clk) usb_reset <= usb_reset_unreg;
-  
 
   // Image Slot 0: Multiboot header and POR springboard.
   // Image Slot 1: DFU Bootloader
