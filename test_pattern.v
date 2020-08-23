@@ -81,7 +81,7 @@ module test_pattern #(
   
 
   localparam FRAME_DELAY_START = 24'd100;
-  localparam FRAME_TIME        = 24'd1200000;
+  localparam FRAME_TIME        = 24'd2400000;
   reg [23:0] frame_delay;
   reg        frame_trigger;
   always @(posedge clk or posedge rst) begin

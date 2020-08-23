@@ -107,17 +107,15 @@ module top (
   assign pin_r3b         = row_data[7];
 
 
-  wire mem_busy;
-
   wire flash_busy;
-  assign flash_busy = mem_busy;
+  assign flash_busy = 0;
   
   wire       frame_complete;
     
   ////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
   ////////
-  //////// generate 48 mhz clock
+  //////// Generate Clocks
   ////////
   ////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
@@ -151,20 +149,6 @@ module top (
     end
   end
   
-  //wire hf_clk;
-  //SB_HFOSC OSCInst0 (
-  //  .CLKHFEN(1),
-  //  .CLKHFPU(~reset),
-  //  .CLKHF(hf_clk)
-  //);
-
-  //reg  clk_48mhz;
-  //always @(posedge hf_clk) clk_48mhz <= ~clk_48mhz;
-  
-  localparam TEXT_LEN = 13;
-  
-  
-
   reg  clk_24mhz = 0;
   always @(posedge clk_48mhz) clk_24mhz <= ~clk_24mhz;
   
@@ -176,7 +160,8 @@ module top (
   
   wire clk;
   wire rst;
-  assign clk = clk_12mhz;
+  localparam CLK_FREQ = 24000000;
+  assign clk = clk_24mhz;
   assign rst = reset;
 
   assign pin_iob_9b = clk_48mhz;
@@ -191,17 +176,13 @@ module top (
   reg [7:0] led_data;
   reg       led_ack;
   
-  wire [7:0] mem_data;
-  wire       mem_ack;
-
   wire [7:0] mem2_data;
   wire       mem2_ack;
 
-  assign ack = |{led_ack, mem_ack};
+  assign ack = |{led_ack};
   
   always @(*) begin
     if      (led_ack)    begin  data_in = led_data;    end
-    else if (mem_ack)    begin  data_in = mem_data;    end
     else if (mem2_ack)   begin  data_in = mem2_data;   end
     else                 begin  data_in = 8'd0;        end
   end
@@ -217,15 +198,6 @@ module top (
   reg         stb;
   reg [2:0]   cti;
     
-  wire        led_drv_cycle;
-  wire        led_drv_cycle_in;
-  wire [15:0] led_drv_adr;
-  wire [7:0]  led_drv_data;
-  wire        led_drv_we;
-  wire        led_drv_sel;
-  wire        led_drv_stb;
-  wire [2:0]  led_drv_cti;
-
   wire        tpat_cycle;
   wire        tpat_cycle_in;
   wire [15:0] tpat_adr;
@@ -235,148 +207,29 @@ module top (
   wire        tpat_stb;
   wire [2:0]  tpat_cti;
   
-  //assign rs232_cycle_in   = led_drv_cycle | tpat_cycle;
-  assign led_drv_cycle_in = tpat_cycle;
-  assign tpat_cycle_in    = led_drv_cycle;
+  //assign rs232_cycle_in   = tpat_cycle;
+  assign tpat_cycle_in    = 0;
 
-  assign cycle = led_drv_cycle | tpat_cycle;
+  assign cycle = tpat_cycle;
     
   always @(*) begin
     //if      (rs232_cycle)    begin  adr = rs232_adr;     data = rs232_data;     we = rs232_we;     sel = rs232_sel;     stb = rs232_stb;     cti = rs232_cti;    end
-    if      (led_drv_cycle)  begin  adr = led_drv_adr;   data = led_drv_data;   we = led_drv_we;   sel = led_drv_sel;   stb = led_drv_stb;   cti = led_drv_cti;  end
-    else if (tpat_cycle)     begin  adr =    tpat_adr;   data =    tpat_data;   we =    tpat_we;   sel =    tpat_sel;   stb =    tpat_stb;   cti =    tpat_cti;  end
-    else                     begin  adr =       16'd0;   data =         8'd0;   we =          0;   sel =           0;   stb =           0;   cti =        3'd0;  end
+    if (tpat_cycle)     begin  adr =    tpat_adr;   data =    tpat_data;   we =    tpat_we;   sel =    tpat_sel;   stb =    tpat_stb;   cti =    tpat_cti;  end
+    else                begin  adr =       16'd0;   data =         8'd0;   we =          0;   sel =           0;   stb =           0;   cti =        3'd0;  end
   end
 
-  
   
   //---------------------------------------------------------------
   assign mem2_data = 0;
   assign mem2_ack = 0;
 
-  wire       mem_spi_sck;
-  wire       mem_spi_cs;
-  wire [3:0] mem_spi_d_out;
-  wire [3:0] mem_spi_d_in;
-  wire [3:0] mem_spi_d_dir;
-
-  wire [3:0] spi_d_in;
-  wire [3:0] spi_d_out;
-  wire [3:0] spi_d_dir;
-  wire       spi_sck;
-  wire       spi_cs;
-
-  assign spi_sck      = mem_spi_sck;
-  assign spi_cs       = mem_spi_cs;
-  assign spi_d_out    = mem_spi_d_out;
-  assign spi_d_dir    = mem_spi_d_dir;
-  assign mem_spi_d_in = spi_d_in;
-
-  assign pin_cs  = spi_cs;
-  assign pin_sck = spi_sck;
-  SB_IO #(
-    .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-    .PULLUP  ( 1'b0       )
-  ) iobuf_d0 (
-    .PACKAGE_PIN   ( pin_mosi     ),
-    .OUTPUT_ENABLE ( spi_d_dir[0] ),
-    .D_OUT_0       ( spi_d_out[0] ),
-    .D_IN_0        ( spi_d_in[0]  )
-  );
-  SB_IO #(
-    .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-    .PULLUP  ( 1'b0       )
-  ) iobuf_d1 (
-    .PACKAGE_PIN   ( pin_miso     ),
-    .OUTPUT_ENABLE ( spi_d_dir[1] ),
-    .D_OUT_0       ( spi_d_out[1] ),
-    .D_IN_0        ( spi_d_in[1]  )
-  );
-  assign spi_d_in[2] = 0;
-  assign spi_d_in[3] = 0;
-  //SB_IO #(
-  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-  //  .PULLUP  ( 1'b1       )
-  //) iobuf_d2 (
-  //  .PACKAGE_PIN   ( pin_wp       ),
-  //  .OUTPUT_ENABLE ( spi_d_dir[2] ),
-  //  .D_OUT_0       ( spi_d_out[2] ),
-  //  .D_IN_0        ( spi_d_in[2]  )
-  //);
-  //SB_IO #(
-  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-  //  .PULLUP  ( 1'b1       )
-  //) iobuf_d3 (
-  //  .PACKAGE_PIN   ( pin_hold     ),
-  //  .OUTPUT_ENABLE ( spi_d_dir[3] ),
-  //  .D_OUT_0       ( spi_d_out[3] ),
-  //  .D_IN_0        ( spi_d_in[3]  )
-  //);
   
-  video_memory #(
-    .ADDRESS_WIDTH   (16),
-    .DATA_WIDTH      (8),
-    .DATA_BYTES      (1),
-    .BASE_ADDRESS    (`FRAME_MEMORY_START),
-    .BASE_FRAME_ADDR (`FRAME_MEMORY_START + 1024)
-  ) vido_memory_inst (
-    .rst_i ( rst      ),
-    .clk_i ( clk      ),
-    .adr_i ( adr      ),
-    .dat_i ( data     ),
-    .dat_o ( mem_data ),
-    .we_i  ( we       ),
-    .sel_i ( sel      ),
-    .stb_i ( stb      ),
-    .cyc_i ( cycle    ),
-    .ack_o ( mem_ack  ),
-    .cti_i ( cti      ),
-
-    .dfu_busy  (  ),
-    .mem_busy  ( mem_busy ),
-    
-    .spi_clk   ( mem_spi_sck   ),
-    .spi_sel   ( mem_spi_cs    ),
-    .spi_d_out ( mem_spi_d_out ),
-    .spi_d_in  ( mem_spi_d_in  ),
-    .spi_d_dir ( mem_spi_d_dir )
-  );
-
-  
-  //wishbone_spram #(
-  //  .ADDRESS_WIDTH (16),
-  //  .DATA_WIDTH    (8),
-  //  .DATA_BYTES    (1),
-  //  .BASE_ADDRESS  (`FRAME_MEMORY_START)
-  //) memory_inst (
-  //  .rst_i ( rst ),
-  //  .clk_i ( clk ),
-  //  .adr_i ( adr ),
-  //  .dat_i ( data ),
-  //  .dat_o ( mem_data ),
-  //  .we_i  ( we ),
-  //  .sel_i ( sel ),
-  //  .stb_i ( stb ),
-  //  .cyc_i ( cycle ),
-  //  .ack_o ( mem_ack ),
-  //  .cti_i ( cti )
-  //);
-
-
-  
-  //assign led_drv_adr = 0;
-  //assign led_drv_data = 0;
-  //assign led_drv_we = 0;
-  //assign led_drv_sel = 0;
-  //assign led_drv_stb = 0;
-  //assign led_drv_cycle = 0;
-  //assign led_drv_cti = 0;
   led_matrix #(
     .ADDRESS_WIDTH   ( 16 ),
     .DATA_WIDTH      ( 8 ),
     .DATA_BYTES      ( 1 ),
     .BASE_ADDRESS    ( `MATRIX_START ),
-    .MAX_WAIT        ( 8 )
+    .BASE_MEM_ADDRESS( `FRAME_MEMORY_START )
   ) led_matrix_inst (
     // Wishbone interface
     .rst_i ( rst ),
@@ -392,18 +245,6 @@ module top (
     .ack_o ( led_ack ),
     .cti_i ( cti ),
   
-    // Wishbone master
-    .frame_adr_o ( led_drv_adr ),
-    .frame_dat_i ( data_in ),
-    .frame_dat_o ( led_drv_data ),
-    .frame_we_o  ( led_drv_we ),
-    .frame_sel_o ( led_drv_sel ),
-    .frame_stb_o ( led_drv_stb ),
-    .frame_cyc_i ( led_drv_cycle_in ),
-    .frame_cyc_o ( led_drv_cycle ),
-    .frame_ack_i ( ack ),
-    .frame_cti_o ( led_drv_cti ),
-  
     // LED Drive Out
     .latch_row_bank ( latch_row_bank ),
     .row_data       ( row_data ),
@@ -416,6 +257,8 @@ module top (
                    
     .debug          ( debug )
   );
+
+  assign debug = { led_ack, cycle, led_data[7:0] };
 
   
   //---------------------------------------------------------------
@@ -450,99 +293,70 @@ module top (
 
 
 
-  //assign tpat_cycle = 0;
-  //assign tpat_adr   = 0;
-  //assign tpat_data  = 0;
-  //assign tpat_we    = 0;
-  //assign tpat_sel   = 0;
-  //assign tpat_stb   = 0;
-  //assign tpat_cti   = 0;
 
   reg [3:0] audio_volume;
   reg [3:0] audio_peak;
   assign audio_peak = 0;
 
-  //video_machine #(
-  //  .ADDRESS_WIDTH       ( 16 ),
-  //  .DATA_WIDTH          ( 8 ),
-  //  .DATA_BYTES          ( 1 ),
-  //  .LED_MATRIX_ADDR     ( `MATRIX_START ),
-  //  .LED_MATRIX_REG_ADDR ( `MATRIX_ADDR_L ),
-  //  .BASE_FRAME_ADDR     ( `FRAME_MEMORY_START + 1024 ),
-  //  .FRAME_SIZE          ( 1024 ), // including header
-  //  .HEADER_SIZE         ( 128 ),
-  //  .CLOCK_MHZ           ( 12 )
-  //) video_machine_inst (// Wishbone master
-  //  .rst_i ( rst ),
-  //  .clk_i ( clk ),
-  //  .adr_o ( tpat_adr ),
-  //  .dat_i ( data_in ),
-  //  .dat_o ( tpat_data ),
-  //  .we_o  ( tpat_we ),
-  //  .sel_o ( tpat_sel ),
-  //  .stb_o ( tpat_stb ),
-  //  .cyc_i ( tpat_cycle_in ),
-  //  .cyc_o ( tpat_cycle ),
-  //  .ack_i ( ack ),
-  //  .cti_o ( tpat_cti ),
-  //
-  //  .frame_complete ( frame_complete ),
-  //  .mem_busy       ( mem_busy ),
-  //  .volume_in      ( audio_volume ),
-  //
-  //  .debug ( debug )
-  //);
-
-  
   generate
-    if (0) begin // flag to switch between the LED test pattern (0) and VU meter (1)
-      test_intensity #(
-        .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1024)
-      )test_pattern_inst (
-        .rst_i ( rst ),
-        .clk_i ( clk ),
-        .adr_o ( tpat_adr ),
-        .dat_i ( data_in ),
-        .dat_o ( tpat_data ),
-        .we_o  ( tpat_we ),
-        .sel_o ( tpat_sel ),
-        .stb_o ( tpat_stb ),
-        .cyc_i ( tpat_cycle_in ),
-        .cyc_o ( tpat_cycle ),
-        .ack_i ( ack ),
-        .cti_o ( tpat_cti ),
-      
-        .volume_in ( audio_volume ),
-        .peak_in   ( audio_peak )
-      );
+    if (0) begin
+      assign tpat_cycle = 0;
+      assign tpat_adr   = 0;
+      assign tpat_data  = 0;
+      assign tpat_we    = 0;
+      assign tpat_sel   = 0;
+      assign tpat_stb   = 0;
+      assign tpat_cti   = 0;
     end
     else begin
-      test_pattern #(
-        .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1024 )//`FRAME_MEMORY_START )
-      )test_pattern_inst (
-        .rst_i ( rst ),
-        .clk_i ( clk ),
-        .adr_o ( tpat_adr ),
-        .dat_i ( data_in ),
-        .dat_o ( tpat_data ),
-        .we_o  ( tpat_we ),
-        .sel_o ( tpat_sel ),
-        .stb_o ( tpat_stb ),
-        .cyc_i ( tpat_cycle_in ),
-        .cyc_o ( tpat_cycle ),
-        .ack_i ( ack ),
-        .cti_o ( tpat_cti )
-      );
+      if (0) begin // flag to switch between the LED test pattern (0) and VU meter (1)
+        test_intensity #(
+          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1024)
+        )test_pattern_inst (
+          .rst_i ( rst ),
+          .clk_i ( clk ),
+          .adr_o ( tpat_adr ),
+          .dat_i ( data_in ),
+          .dat_o ( tpat_data ),
+          .we_o  ( tpat_we ),
+          .sel_o ( tpat_sel ),
+          .stb_o ( tpat_stb ),
+          .cyc_i ( tpat_cycle_in ),
+          .cyc_o ( tpat_cycle ),
+          .ack_i ( ack ),
+          .cti_o ( tpat_cti ),
+        
+          .volume_in ( audio_volume ),
+          .peak_in   ( audio_peak )
+        );
+      end
+      else begin
+        test_pattern #(
+          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1024 )//`FRAME_MEMORY_START )
+        )test_pattern_inst (
+          .rst_i ( rst ),
+          .clk_i ( clk ),
+          .adr_o ( tpat_adr ),
+          .dat_i ( data_in ),
+          .dat_o ( tpat_data ),
+          .we_o  ( tpat_we ),
+          .sel_o ( tpat_sel ),
+          .stb_o ( tpat_stb ),
+          .cyc_i ( tpat_cycle_in ),
+          .cyc_o ( tpat_cycle ),
+          .ack_i ( ack ),
+          .cti_o ( tpat_cti )
+        );
+      end
     end
   endgenerate
 
   wire signed [11:0] audio1;
-  wire signed [11:0] audio2;
   wire               audio_valid;
   pdm_mic #(
     .SAMPLE_DEPTH      ( 12 ),
     .FIR_SAMPLE_LENGTH ( 8192 ),
-    .INPUT_FREQUENCY   ( 12000000 ),
+    .INPUT_FREQUENCY   ( CLK_FREQ ),
     .FREQUENCY         (  2000000 ),
     .SAMPLE_FREQUENCY  ( 8000 )
   ) mic_inst (
@@ -553,129 +367,25 @@ module top (
     .mic_data ( pin_mic_data ),
 
     .audio1 ( audio1 ),
-    .audio2 ( audio2 ),
     .audio_valid ( audio_valid )
   );
 
-  //localparam N_BUCKETS = 16;
-  //reg [11:0]        audio_sample [0:N_BUCKETS-1];
-  //integer            shift_i;
-  //always @(posedge clk) begin
-  //  if (audio_valid) begin
-  //    for (shift_i = 1; shift_i < 16; shift_i = shift_i + 1) begin
-  //      audio_sample[shift_i] <= audio_sample[shift_i-1];
-  //    end
-  //    audio_sample[0] <= audio1;
-  //  end
-  //end
-  //
-  //reg [16:0] accum_1 = 0;
-  //reg [16:0] accum_2 = 0;
-  //reg [16:0] accum_3 = 0;
-  //reg [16:0] accum_4 = 0;
-  //
-  //reg [16:0] next_accum_1;
-  //reg [16:0] next_accum_2;
-  //reg [16:0] next_accum_3;
-  //reg [16:0] next_accum_4;
-  //
-  //reg signed [16:0]  add1_in1;
-  //reg signed [11:0]  add1_in2;
-  //reg signed [11:0]  add1_in3;
-  //wire signed [15:0] add1_result;
-  //
-  //assign add1_result = add1_in1 + add1_in2 - add1_in3;
-  //
-  //localparam FILT_STATE_1       = 0;
-  //localparam FILT_STATE_2       = 1;
-  //localparam FILT_STATE_3       = 2;
-  //localparam FILT_STATE_4       = 3;
-  //localparam FILT_STATE_END     = 4;
-  //reg [2:0]         filter_state;
-  //
-  //always @(*) begin
-  //  next_accum_1 = accum_1;
-  //  next_accum_2 = accum_2;
-  //  next_accum_3 = accum_3;
-  //  next_accum_4 = accum_4;
-  //
-  //  add1_in1 = 0;
-  //  add1_in2 = 0;
-  //  add1_in3 = 0;
-  //
-  //  case (filter_state)
-  //  FILT_STATE_1: begin
-  //    add1_in1     = accum_1;
-  //    add1_in2     = audio1;
-  //    add1_in3     = audio_sample[1];
-  //    next_accum_1 = add1_result;
-  //  end
-  //
-  //  FILT_STATE_2: begin
-  //    add1_in1     = accum_2;
-  //    add1_in2     = audio1;
-  //    add1_in3     = audio_sample[3];
-  //    next_accum_2 = add1_result;
-  //  end
-  //
-  //  FILT_STATE_3: begin
-  //    add1_in1     = accum_3;
-  //    add1_in2     = audio1;
-  //    add1_in3     = audio_sample[7];
-  //    next_accum_3 = add1_result;
-  //  end
-  //
-  //  FILT_STATE_4: begin
-  //    add1_in1     = accum_4;
-  //    add1_in2     = audio1;
-  //    add1_in3     = audio_sample[15];
-  //    next_accum_4 = add1_result;
-  //  end
-  //  endcase
-  //end
-  //
-  //
-  //always @(posedge clk) begin
-  //  if (filter_state > 3) begin
-  //    if (audio_valid) filter_state  = 0;
-  //  end
-  //  else begin
-  //    filter_state <= filter_state + 1;
-  //  end
-  //  accum_1 <= next_accum_1;
-  //  accum_2 <= next_accum_2;
-  //  accum_3 <= next_accum_3;
-  //  accum_4 <= next_accum_4;
-  //end
-  //
-  //wire signed [11:0] filt_4    = accum_4[16:5];
-  //wire signed [11:0] filt_3    = accum_3[15:4];
-  //wire signed [11:0] filt_2    = accum_2[14:3];
-  //wire signed [11:0] filt_1    = accum_1[13:2];
-  //
-  //wire [11:0]        abs_audio  = ( filt_4 >= 0 ? filt_4 : -filt_4 );
-  //wire [11:0]        abs_audio2 = ( filt_1 >= 0 ? filt_1 : -filt_1 );
 
    
   wire [11:0]        abs_audio  = ( audio1 >= 0 ? audio1 : -audio1 );
 
-  //reg [11:0]         peak_value;
-  reg [11:0]         volume_value;
+  reg [11:0]         volume_value = 0;
   
   localparam UPDATE_COUNT = (12000000 / 200);
   localparam UPDATE_COUNT_WIDTH = $clog2(UPDATE_COUNT);
   reg [UPDATE_COUNT_WIDTH-1:0] update_counter;
   always @(posedge clk) begin
-    //if (abs_audio > peak_value) peak_value <= abs_audio;
     if (abs_audio > volume_value) volume_value <= abs_audio;
-
+  
     if (update_counter) update_counter <= update_counter - 1;
     else begin
       update_counter <= UPDATE_COUNT;
-
-      //if (peak_value > 0) peak_value <= peak_value - 1;
-      //else                  peak_value <= 0;
-
+  
       audio_volume <= ( abs_audio[11] ? 10 :
                         abs_audio[10] ? 10 :
                         abs_audio[ 9] ?  8 :
@@ -688,29 +398,10 @@ module top (
                         abs_audio[ 2] ?  0 :
                         abs_audio[ 1] ?  0 : 0);
       
-      //audio_peak <= ( peak_value[15] ? 10 :
-      //                peak_value[14] ? 10 :
-      //                peak_value[13] ? 10 :
-      //                peak_value[12] ? 10 :
-      //                peak_value[11] ? 10 :
-      //                peak_value[10] ? 10 :
-      //                peak_value[ 9] ?  8 :
-      //                peak_value[ 8] ?  6 :
-      //                peak_value[ 7] ?  5 :
-      //                peak_value[ 6] ?  4 :
-      //                peak_value[ 5] ?  3 :
-      //                peak_value[ 4] ?  2 :
-      //                peak_value[ 3] ?  1 :
-      //                peak_value[ 2] ?  0 :
-      //                peak_value[ 1] ?  0 : 0);
-      
       volume_value <= 0;
     end
   end
 
-  
-  
-  //assign debug = {audio_volume, abs_audio[7:0]};
                    
   
 
@@ -741,11 +432,6 @@ module top (
     .D_IN_0(usb_n_in)
   );
   
-  //reg  reset_armed = 0;
-  //always @(clk) begin
-  //  if (!(dfu_state == DFU_STATE_appIDLE || dfu_state == DFU_STATE_dfuIDLE)) reset_armed = 1;
-  //end
-
 
   // Image Slot 0: Multiboot header and POR springboard.
   // Image Slot 1: DFU Bootloader
@@ -756,4 +442,46 @@ module top (
     .BOOT(dfu_detach)
   );
 
+
+  //assign pin_sck = spi_sck;
+  //SB_IO #(
+  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+  //  .PULLUP  ( 1'b0       )
+  //) iobuf_d0 (
+  //  .PACKAGE_PIN   ( pin_mosi     ),
+  //  .OUTPUT_ENABLE ( spi_d_dir[0] ),
+  //  .D_OUT_0       ( spi_d_out[0] ),
+  //  .D_IN_0        ( spi_d_in[0]  )
+  //);
+  //SB_IO #(
+  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+  //  .PULLUP  ( 1'b0       )
+  //) iobuf_d1 (
+  //  .PACKAGE_PIN   ( pin_miso     ),
+  //  .OUTPUT_ENABLE ( spi_d_dir[1] ),
+  //  .D_OUT_0       ( spi_d_out[1] ),
+  //  .D_IN_0        ( spi_d_in[1]  )
+  //);
+  //assign spi_d_in[2] = 0;
+  //assign spi_d_in[3] = 0;
+  //SB_IO #(
+  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+  //  .PULLUP  ( 1'b1       )
+  //) iobuf_d2 (
+  //  .PACKAGE_PIN   ( pin_wp       ),
+  //  .OUTPUT_ENABLE ( spi_d_dir[2] ),
+  //  .D_OUT_0       ( spi_d_out[2] ),
+  //  .D_IN_0        ( spi_d_in[2]  )
+  //);
+  //SB_IO #(
+  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+  //  .PULLUP  ( 1'b1       )
+  //) iobuf_d3 (
+  //  .PACKAGE_PIN   ( pin_hold     ),
+  //  .OUTPUT_ENABLE ( spi_d_dir[3] ),
+  //  .D_OUT_0       ( spi_d_out[3] ),
+  //  .D_IN_0        ( spi_d_in[3]  )
+  //);
+
+  
 endmodule

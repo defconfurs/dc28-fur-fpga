@@ -26,17 +26,6 @@ module led_matrix_tb #() ();
     wire                    dug_ack;
     reg [2:0]               cti;
     
-    wire [ADDRESS_WIDTH-1:0] frame_adr_o;
-    reg [DATA_WIDTH-1:0]     frame_dat_i;
-    wire [DATA_WIDTH-1:0]    frame_dat_o;
-    wire                     frame_we_o;
-    wire [DATA_BYTES-1:0]    frame_sel_o;
-    wire                     frame_stb_o;
-    reg                      frame_cyc_i;
-    wire                     frame_cyc_o;
-    reg                      frame_ack_i;
-    wire [2:0]               frame_cti_o;
-
     wire                      shift_1st_line;
     wire                      shift_clock;
     wire [3:0]                led_out;
@@ -65,18 +54,6 @@ module led_matrix_tb #() ();
         .cyc_i (cycle),
         .ack_o (dut_ack),
         .cti_i (cti),
-
-        // Wishbone master
-        .frame_adr_o (frame_adr_o),
-        .frame_dat_i (frame_dat_i),
-        .frame_dat_o (frame_dat_o),
-        .frame_we_o  (frame_we_o),
-        .frame_sel_o (frame_sel_o),
-        .frame_stb_o (frame_stb_o),
-        .frame_cyc_i (frame_cyc_i),
-        .frame_cyc_o (frame_cyc_o),
-        .frame_ack_i (frame_ack_i),
-        .frame_cti_o (frame_cti_p),
     
         // LED Drive Out
         .shift_1st_line (shift_1st_line),

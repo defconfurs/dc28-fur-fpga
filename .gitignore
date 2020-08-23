@@ -4,3 +4,5 @@
 *.bin
 brightness_lut_rom.txt
 filter_bank_mem.txt
+*~
+OLD/*

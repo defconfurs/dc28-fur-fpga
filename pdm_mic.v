@@ -12,7 +12,6 @@ module pdm_mic #(
   input wire                           mic_data,
   
   output reg signed [SAMPLE_DEPTH-1:0] audio1,
-  output reg signed [SAMPLE_DEPTH-1:0] audio2,
   output reg                           audio_valid
   );
 
@@ -47,54 +46,44 @@ module pdm_mic #(
 
   
   reg mic1_in = 0;
-  reg mic2_in = 0;
   always @(posedge clk) begin
-    if (output_clk)     mic1_in <= mic_data;
-    if (output_clk_180) mic2_in <= mic_data;
+    if (output_clk_180) mic1_in <= mic_data;
   end
 
   
   localparam PERIOD_WIDTH = $clog2(FIR_SAMPLE_LENGTH-1);
 
-  reg [1:0]              sample_mem [0:FIR_SAMPLE_LENGTH-1];
+  reg                    sample_mem [0:FIR_SAMPLE_LENGTH-1];
   reg [PERIOD_WIDTH-1:0] sample_mem_addr;
 
   reg signed [PERIOD_WIDTH-1:0] sample1_out;
-  reg signed [PERIOD_WIDTH-1:0] sample2_out;
-
   reg signed [PERIOD_WIDTH-1:0] next_sample1_out;
-  reg signed [PERIOD_WIDTH-1:0] next_sample2_out;
 
   always @(*) begin
     if (rst) begin 
       next_sample1_out = 0;
-      next_sample2_out = 0;
     end
     else begin
-      next_sample1_out = sample1_out + (mic1_in ? 1 : -1) - (sample_mem[sample_mem_addr][0] ? 1 : -1);
-      next_sample2_out = sample2_out + (mic2_in ? 1 : -1) - (sample_mem[sample_mem_addr][1] ? 1 : -1);
+      next_sample1_out = sample1_out + (mic1_in ? 1 : -1) - (sample_mem[sample_mem_addr] ? 1 : -1);
     end
   end
   
 
   always @(posedge clk) begin
-    sample_mem[sample_mem_addr] <= { mic1_in, mic2_in };
+    sample_mem[sample_mem_addr] <= mic1_in;
     sample_mem_addr             <= sample_mem_addr + 1;
     sample1_out                 <= next_sample1_out;
-    sample2_out                 <= next_sample2_out;
   end
 
   
   always @(posedge clk or posedge rst) begin
     if (rst) begin
       audio1 <= 0;
-      audio2 <= 0;
     end
     else begin
       audio_valid <= div_sample;
       if (div_sample) begin
         audio1 <= sample1_out;
-        audio2 <= sample2_out;
       end
     end
   end

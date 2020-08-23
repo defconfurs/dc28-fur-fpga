@@ -1,11 +1,11 @@
 `include "globals.vh"
 
 module led_matrix #(
-    parameter ADDRESS_WIDTH   = 16,
-    parameter DATA_WIDTH      = 8,
-    parameter DATA_BYTES      = 1,
-    parameter BASE_ADDRESS    = 0,
-    parameter MAX_WAIT        = 8
+    parameter ADDRESS_WIDTH    = 16,
+    parameter DATA_WIDTH       = 8,
+    parameter DATA_BYTES       = 1,
+    parameter BASE_ADDRESS     = 0,
+    parameter BASE_MEM_ADDRESS = 'h8000
 )  (
   // Wishbone interface
   input wire                      rst_i,
@@ -21,18 +21,6 @@ module led_matrix #(
   output reg                      ack_o,
   input wire [2:0]                cti_i,
 
-  // Wishbone master
-  output wire [ADDRESS_WIDTH-1:0] frame_adr_o,
-  input wire [DATA_WIDTH-1:0]     frame_dat_i,
-  output wire [DATA_WIDTH-1:0]    frame_dat_o,
-  output wire                     frame_we_o,
-  output wire [DATA_BYTES-1:0]    frame_sel_o,
-  output wire                     frame_stb_o,
-  input wire                      frame_cyc_i,
-  output wire                     frame_cyc_o,
-  input wire                      frame_ack_i,
-  output wire [2:0]               frame_cti_o,
-  
   // LED Drive Out
   output reg [3:0]                latch_row_bank,
   output reg [7:0]                row_data,
@@ -46,27 +34,22 @@ module led_matrix #(
     
   input wire [15:0]               debug
   );
-
+  
   localparam N_COLS             = 10;
   localparam N_ROWS             = 14;
   localparam SHIFT_CLOCK_PERIOD = 64;
-  localparam TOTAL_LOAD_TIME    = MAX_WAIT * N_COLS / 2;
-  localparam TOTAL_LINE_TIME    = 16'h800; // don't forget to update for the maximum PWM time
+  localparam TOTAL_LOAD_TIME    = 2 * N_COLS / 2;
+  localparam TOTAL_LINE_TIME    = 'h400; // don't forget to update for the maximum PWM time
+
+  localparam TOTAL_LOAD_TIME_SIZE = $clog2(TOTAL_LOAD_TIME+1);
+  localparam TOTAL_LINE_TIME_SIZE = $clog2(TOTAL_LINE_TIME+1);
 
   localparam COL_STEP =  1*2;
   localparam ROW_STEP = 32*2;
 
-  localparam N_COLS_SIZE = (N_COLS < 4 ? 2 :
-                            N_COLS < 8 ? 3 :
-                            N_COLS < 16 ? 4 :
-                            N_COLS < 32 ? 5 : 6);
-  localparam N_ROWS_SIZE = (N_ROWS < 2 ? 1 :
-                            N_ROWS < 4 ? 2 :
-                            N_ROWS < 8 ? 3 :
-                            N_ROWS < 16 ? 4 :
-                            N_ROWS < 32 ? 5 : 6);
+  localparam N_COLS_SIZE = $clog2(N_COLS+1);
+  localparam N_ROWS_SIZE = $clog2(N_ROWS+1);
   
- 
   // alias so it's easier to type
   wire       clk;
   wire       rst;
@@ -74,28 +57,29 @@ module led_matrix #(
   assign rst = rst_i;
 
   reg [31:0] led_out_state;
-  
 
+
+  localparam MEM_ADDR_WIDTH = 14;
+
+  reg                       mem_busy;
+  wire [MEM_ADDR_WIDTH-1:0] ram_address;
+  wire [15:0]               ram_data_in;
+  reg [15:0]                ram_data_out;
+  reg                       ram_we;
+
+  
+  wire [MEM_ADDR_WIDTH+1-1:0] wb_mem_address;
+  wire [7:0]                  wb_mem_data_out;
+  wire [7:0]                  wb_mem_data_in;
+  wire                        wb_mem_we;
+
+  
   // control registers
-  reg [15:0] frame_address;
-  reg [15:0] latched_frame_address;
+  reg [14:0] frame_address;
+  reg [14:0] latched_frame_address;
   reg [7:0]  global_brightness;
   reg        enabled;
 
-  reg [3:0]        local_clock_div = 0;
-  reg              local_clk_pulse = 0;
-  always @(posedge clk) begin
-    if (local_clock_div) begin
-      local_clock_div <= local_clock_div - 1;
-      local_clk_pulse <= 0;
-    end
-    else begin
-      local_clock_div <= 7;
-      local_clk_pulse <= 1;
-    end
-  end
-  wire local_clk;
-  assign local_clk = local_clock_div[3];
   
   //===========================================================================================
   // Wishbone slave
@@ -105,25 +89,32 @@ module led_matrix #(
   wire [3:0] local_address;
   assign address_in_range = (adr_i & 16'hFFF0) == BASE_ADDRESS;
   assign local_address = address_in_range ? adr_i[3:0] : 4'hF;
-  wire       masked_cyc = (address_in_range & cyc_i);
+
+  wire       address_in_mem_range;
+  assign address_in_mem_range = (adr_i & ~((1<<MEM_ADDR_WIDTH)-1)) == BASE_MEM_ADDRESS;
+  assign wb_mem_address = (adr_i & ((1<<MEM_ADDR_WIDTH)-1));
   
+  wire       masked_cyc = ((address_in_range || address_in_mem_range) & cyc_i);
+  assign wb_mem_we = (stb_i & address_in_mem_range & we_i);
+  assign wb_mem_data_in = dat_i;
   
   always @(posedge clk_i) begin
-    ack_o <= cyc_i & valid_address;
+    if (address_in_mem_range && mem_busy) ack_o = 0;
+    else ack_o <= cyc_i & valid_address;
   end
   
   always @(posedge clk_i or posedge rst_i) begin
     if (rst_i) begin
-      frame_address     <= `DEFAULT_FRAME_ADDRESS;
+      frame_address     <= `DEFAULT_FRAME_ADDRESS >> 1;
       enabled           <= 1;
       global_brightness <= 8'hFF;
     end
     else begin
-      if (masked_cyc & we_i) begin
+      if (masked_cyc & we_i & address_in_range) begin
         if      (local_address == `MATRIX_CONTROL    ) { enabled } <= dat_i[0];
         else if (local_address == `MATRIX_BRIGHTNESS ) { global_brightness } <= dat_i;
-        else if (local_address == `MATRIX_ADDR_L     ) { frame_address[7:0] } <= dat_i;
-        else if (local_address == `MATRIX_ADDR_H     ) { frame_address[15:8] } <= dat_i;
+        else if (local_address == `MATRIX_ADDR_L     ) { frame_address[6:0] } <= dat_i[7:1];
+        else if (local_address == `MATRIX_ADDR_H     ) { frame_address[14:7] } <= dat_i;
       end
     end
   end
@@ -131,60 +122,61 @@ module led_matrix #(
 
   always @(*) begin
     if (~masked_cyc) begin valid_address = 0; dat_o = 0; end
+    else if (address_in_mem_range) begin
+      valid_address = 1;
+      dat_o         = wb_mem_data_out;
+    end
     else if (local_address == `MATRIX_CONTROL    ) begin  valid_address = 1;  dat_o = { 7'd0, enabled }; end
     else if (local_address == `MATRIX_BRIGHTNESS ) begin  valid_address = 1;  dat_o = { global_brightness }; end
-    else if (local_address == `MATRIX_ADDR_L     ) begin  valid_address = 1;  dat_o = { frame_address[7:0] }; end
-    else if (local_address == `MATRIX_ADDR_H     ) begin  valid_address = 1;  dat_o = { frame_address[15:8] }; end
+    else if (local_address == `MATRIX_ADDR_L     ) begin  valid_address = 1;  dat_o = { frame_address[6:0], 1'b0 }; end
+    else if (local_address == `MATRIX_ADDR_H     ) begin  valid_address = 1;  dat_o = { frame_address[14:7] }; end
     else begin 
       valid_address = 0;
-      dat_o = 0;
+      dat_o         = 0;
     end
   end
 
   //===========================================================================================
   // Wishbone Master - Pixel Reader
-  localparam MAX_PAYLOAD = 2;
-  localparam INTERFACE_WIDTH = 3 * DATA_WIDTH;
+
+  assign ram_data_in = 0;
   
-  wire [ADDRESS_WIDTH-1:0]     pixel_address;
-  wire [INTERFACE_WIDTH-1:0]   payload_out;
-  reg                          start_read = 0;
-  wire                         read_busy;
-  wire                         completed;
-  wire                         timeout;
-
-  wishbone_master #(
-    .ADDRESS_WIDTH (ADDRESS_WIDTH),
-    .DATA_WIDTH    (DATA_WIDTH),
-    .DATA_BYTES    (DATA_BYTES),
-    .MAX_WAIT      (MAX_WAIT),
-    .MAX_PAYLOAD   (3)
-  ) wb_master (
-    // Wishbone interface
-    .rst_i           ( rst_i          ),
-    .clk_i           ( clk_i          ),
-    .adr_o           ( frame_adr_o    ),
-    .dat_i           ( frame_dat_i    ),
-    .dat_o           ( frame_dat_o    ),
-    .we_o            ( frame_we_o     ),
-    .sel_o           ( frame_sel_o    ),
-    .stb_o           ( frame_stb_o    ),
-    .cyc_i           ( frame_cyc_i    ),
-    .cyc_o           ( frame_cyc_o    ),
-    .ack_i           ( frame_ack_i    ),
-    .cti_o           ( frame_cti_o    ),
-
-    // packet interface
-    .transfer_address( pixel_address  ),
-    .payload_in      ( 0              ),
-    .payload_out     ( payload_out    ),
-    .payload_length  ( 3              ),
-    .start_read      ( start_read     ),
-    .read_busy       ( read_busy      ),
-    .start_write     ( 0              ),
-    .write_busy      (                ),
-    .completed       ( completed      ),
-    .timeout         ( timeout        )
+  reg [MEM_ADDR_WIDTH-1:0]  raminst_address;
+  reg [15:0]                raminst_data_in;
+  wire [15:0]               raminst_data_out;
+  reg [1:0]                 raminst_wen;
+  always @(*) begin
+    if (mem_busy) begin
+      raminst_wen     = { ram_we, ram_we };
+      raminst_data_in = ram_data_in;
+      raminst_address = ram_address;
+      ram_data_out    = raminst_data_out;
+      wb_mem_data_out = 0;
+    end
+    else begin
+      raminst_wen     = wb_mem_address[0] ? { wb_mem_we, 1'b0 } : { 1'b0, wb_mem_we };
+      raminst_data_in = { wb_mem_data_in, wb_mem_data_in };
+      raminst_address = wb_mem_address[MEM_ADDR_WIDTH+1-1:1];
+      wb_mem_data_out = wb_mem_address[0] ? raminst_data_out[15:8] : raminst_data_out[7:0];
+      ram_data_out    = 0;
+    end
+  end
+  assign ram_we = 0;
+  
+  reg [MEM_ADDR_WIDTH-1:0]  latched_address;
+  always @(posedge clk_i) latched_address <= raminst_address;
+  SB_SPRAM256KA ram00
+  (
+    .ADDRESS    (raminst_address),
+    .DATAIN     ({raminst_data_in}),
+    .MASKWREN   ({raminst_wen[1], raminst_wen[1], raminst_wen[0], raminst_wen[0]}),
+    .WREN       (raminst_wen[0] | raminst_wen[1]),
+    .CHIPSELECT (1),
+    .CLOCK      (clk_i),
+    .STANDBY    (1'b0),
+    .SLEEP      (1'b0),
+    .POWEROFF   (1'b1),
+    .DATAOUT    (raminst_data_out)
   );
   
   localparam FIELD_RED   = 3'b001;
@@ -204,9 +196,9 @@ module led_matrix #(
   reg [7:0] field_lut_addr = 0;
   always @(*) begin
     case (current_field)
-    FIELD_RED:   field_lut_addr = { 2'b00, payload_out[15:11], 1'b0 };
-    FIELD_GREEN: field_lut_addr = { 2'b01, payload_out[10:5] };
-    FIELD_BLUE:  field_lut_addr = { 2'b10, payload_out[4:0], 1'b0 };
+    FIELD_RED:   field_lut_addr = { 2'b00, ram_data_out[15:11], 1'b0 };
+    FIELD_GREEN: field_lut_addr = { 2'b01, ram_data_out[10:5] };
+    FIELD_BLUE:  field_lut_addr = { 2'b10, ram_data_out[4:0], 1'b0 };
     default: field_lut_addr     = 8'd0;
     endcase
   end
@@ -230,49 +222,23 @@ module led_matrix #(
   //===========================================================================================
   // The matrix display
   
-  reg [PIXEL_TIMER_SIZE-1:0]   col_timer = 0;
-  reg [PIXEL_TIMER_SIZE-1:0]   load_timer = 0;
+  reg [TOTAL_LINE_TIME_SIZE-1:0]   col_timer = 0;
+  reg [TOTAL_LOAD_TIME_SIZE-1:0]   load_timer = 0;
 
-  localparam LOAD_STATE_START_REQUEST     = 4'b0001;
-  localparam LOAD_STATE_COMPLETE_REQUEST  = 4'b0010;
-  localparam LOAD_STATE_GET_VALUE         = 4'b0100;
-  localparam LOAD_STATE_LOAD_WAIT         = 4'b1000;
-  reg [3:0] load_state = LOAD_STATE_START_REQUEST;
-
-  //reg [PIXEL_TIMER_SIZE-1:0]   pixel_timers [0:N_ROWS-1];
-  //reg [PIXEL_TIMER_SIZE+1-1:0] pixel_accum [0:N_ROWS-1];
-  //integer pdm_i;
-  //always @(posedge local_clk) begin
-  //  for (pdm_i = 0; pdm_i < N_ROWS; pdm_i = pdm_i+1) begin
-  //    if (col_timer) begin
-  //      if (pixel_accum[pdm_i] + pixel_timers[pdm_i] >= TOTAL_LINE_TIME) begin
-  //        pixel_accum[pdm_i]   <= pixel_accum[pdm_i] + pixel_timers[pdm_i] - TOTAL_LINE_TIME;
-  //        led_out_state[pdm_i] <= 1;
-  //      end
-  //      else begin
-  //        pixel_accum[pdm_i]   <= pixel_accum[pdm_i] + pixel_timers[pdm_i];
-  //        led_out_state[pdm_i] <= 0;
-  //      end
-  //    end
-  //    else begin
-  //      pixel_accum[pdm_i] <= TOTAL_LINE_TIME-1;
-  //      led_out_state[pdm_i] <= 0;
-  //    end
-  //  end
-  //end
-
-  //always @(posedge clk) begin
-  //  address <= 2 * (col)
+  localparam LOAD_STATE_START_REQUEST     = 5'b00001;
+  localparam LOAD_STATE_REQUEST_DELAY     = 5'b00010;
+  localparam LOAD_STATE_COMPLETE_REQUEST  = 5'b00100;
+  localparam LOAD_STATE_GET_VALUE         = 5'b01000;
+  localparam LOAD_STATE_LOAD_WAIT         = 5'b10000;
+  reg [4:0] load_state = LOAD_STATE_START_REQUEST;
 
   wire [4:0] xpos;
   wire [3:0] ypos;
   assign xpos = { current_col, pixel_being_updated[0] };
   assign ypos = { pixel_being_updated[4:1] };
 
-  assign pixel_address = (latched_frame_address + 
-                          { ypos, xpos[4:1], xpos[0]^ypos[0], 1'b0 });
-  
-
+  assign ram_address = (latched_frame_address + 
+                        { ypos, xpos[4:1], xpos[0]^ypos[0] });
   
   reg [PIXEL_TIMER_SIZE-1:0]   pixel_timers [0:(N_ROWS<<1)-1];
   reg [PIXEL_TIMER_SIZE-1:0]   pixel_timers_active [0:(N_ROWS<<1)-1];
@@ -299,6 +265,7 @@ module led_matrix #(
   integer i;
   always @(posedge clk or posedge rst) begin
     if (rst) begin
+      mem_busy              <= 0;
       col_timer             <= TOTAL_LINE_TIME;
       load_state            <= LOAD_STATE_START_REQUEST;
       current_field         <= FIELD_BLUE;
@@ -310,28 +277,33 @@ module led_matrix #(
     
     else begin
       if (col_timer) begin
-        col_timer <= col_timer - 1;
+        col_timer  <= col_timer - 1;
         
         load_timer <= TOTAL_LOAD_TIME;
+        mem_busy   <= 0;
       end
       else begin // new col
         if (load_timer) load_timer <= load_timer -1;
         
         case (load_state)
         LOAD_STATE_START_REQUEST: begin
-          start_read     <= 1;
+          mem_busy       <= 1;
           frame_complete <= 0;
-          if (read_busy) load_state <= LOAD_STATE_COMPLETE_REQUEST;
+          load_state     <= LOAD_STATE_REQUEST_DELAY;
+        end
+        
+        LOAD_STATE_REQUEST_DELAY: begin
+          mem_busy   <= 1;
+          load_state <= LOAD_STATE_COMPLETE_REQUEST;
         end
         
         LOAD_STATE_COMPLETE_REQUEST: begin
-          start_read <= 0;
-          
-          if (!read_busy) load_state <= LOAD_STATE_GET_VALUE;
+          mem_busy   <= 0;
+          load_state <= LOAD_STATE_GET_VALUE;
         end
         
         LOAD_STATE_GET_VALUE: begin
-          start_read <= 0;
+          mem_busy <= 0;
           
           for (i = 0; i < N_ROWS<<1; i = i+1) begin
             if (i == pixel_being_updated) begin
@@ -346,7 +318,6 @@ module led_matrix #(
           end
           else begin
             pixel_being_updated <= 0;
-
             
             case(current_field)
             FIELD_BLUE:  begin  current_field <= FIELD_GREEN;  end
@@ -360,7 +331,8 @@ module led_matrix #(
         end
         
         LOAD_STATE_LOAD_WAIT: begin
-          start_read <= 0;
+          mem_busy <= 0;
+
           if (!load_timer) begin
             load_state <= LOAD_STATE_START_REQUEST;
             load_timer <= TOTAL_LOAD_TIME;
@@ -384,11 +356,7 @@ module led_matrix #(
     end
   end
 
-  localparam SHIFT_CLOCK_COUNTER_SIZE = (SHIFT_CLOCK_PERIOD < 16 ? 4 :
-                                         SHIFT_CLOCK_PERIOD < 32 ? 5 :
-                                         SHIFT_CLOCK_PERIOD < 64 ? 6 :
-                                         SHIFT_CLOCK_PERIOD < 128 ? 7 :
-                                         SHIFT_CLOCK_PERIOD < 256 ? 8 : 9);
+  localparam SHIFT_CLOCK_COUNTER_SIZE = $clog2(SHIFT_CLOCK_PERIOD+1);
   reg [SHIFT_CLOCK_COUNTER_SIZE-1:0] shift_clock_counter;
   
   wire state_is_load = (load_state != LOAD_STATE_LOAD_WAIT); // LOAD_STATE_LOAD_WAIT
