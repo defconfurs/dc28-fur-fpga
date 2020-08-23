@@ -1,122 +1,166 @@
-# Cross-platform iCEstick build script
-
-# Steven Herbst <sgherbst@gmail.com>
-# Updated: February 28, 2017
-
-# `python make.py build` will build 
-# `python make.py upload` will upload the generated bitstream to the FPGA
-# `python make.py clean` will remove generated binaries
-
-# Inspired by CS448H, Winter 2017
-# https://github.com/rdaly525/CS448H
-
+#!/usr/bin/python3
 import os
 import sys
 import argparse
 from subprocess import call
 from glob import glob
 
+srcdir = os.path.dirname(os.path.abspath(__file__))
+
+#######################################
+## FPGA Source Files
+#######################################
+pcf_file = "Prototype2_hardware.pcf"
+
+# Common USB sources, shared by both the DFU bootloader and user bitstream.
+rtl_usb_dir = 'tinydfu-bootloader/usb'
+rtl_usb_srcs = ["edge_detect.v",
+                "strobe.v",
+                "usb_fs_in_arb.v",
+                "usb_fs_in_pe.v",
+                "usb_fs_out_arb.v",
+                "usb_fs_out_pe.v",
+                "usb_fs_pe.v",
+                "usb_fs_rx.v",
+                "usb_fs_tx_mux.v",
+                "usb_fs_tx.v",
+                "usb_string_rom.v",
+                "usb_phy_ice40.v"]
+
+# DFU Bootloader sources.
+dfu_usb_srcs = rtl_usb_srcs
+dfu_usb_srcs += ["usb_dfu_core.v",
+                "usb_dfu_ctrl_ep.v",
+                "usb_spiflash_bridge.v"]
+
+boot_srcs = [ os.path.join('bootloader', 'tinydfu.v'), 'pll48mhz.v' ]
+boot_srcs += [ os.path.join(rtl_usb_dir, x) for x in dfu_usb_srcs ] 
+
+# User Bitstream sources.
+stub_usb_srcs = rtl_usb_srcs
+stub_usb_srcs += ["usb_dfu_stub.v",
+                  "usb_dfu_stub_ep.v"]
+
+sources = glob(os.path.join(srcdir, '*.v'))
+sources += [ os.path.join(rtl_usb_dir, x) for x in stub_usb_srcs ]
+
+#######################################
+## Locate Toolchain Paths
+#######################################
+if os.name=='nt':
+    pio_rel = '.apio\\packages'
+    #pio_rel = '.platformio\\packages\\toolchain-icestorm\\bin'
+    home_path = os.getenv('HOMEPATH')
+
+    # Build the full path to IceStorm tools
+    pio = os.path.join(home_path, pio_rel)
+
+    # Tools used in the flow
+    icepack       = os.path.join(pio, 'toolchain-ice40\\bin\\icepack.exe')
+    icemulti      = os.path.join(pio, 'toolchain-ice40\\bin\\icemulti.exe')
+    arachne_pnr   = os.path.join(pio, 'toolchain-ice40\\bin\\arachne-pnr.exe')
+    nextpnr_ice40 = os.path.join(pio, 'toolchain-ice40\\bin\\nextpnr-ice40.exe')
+    yosys         = os.path.join(pio, 'toolchain-yosys\\bin\\yosys.exe')
+    iceprog       = os.path.join(pio, 'toolchain-ice40\\bin\\iceprog.exe')
+
+else:
+    pio_rel = '.platformio/packages/toolchain-icestorm/bin'
+    pio = os.path.join(os.environ['HOME'], pio_rel)
+    
+    # Use PlatformIO, if it exists.
+    if os.path.exists(pio):
+        icepack       = os.path.join(pio, 'icepack')
+        icemulti      = os.path.join(pio, 'icemulti')
+        arachne_pnr   = os.path.join(pio, 'arachne-pnr')
+        nextpnr_ice40 = os.path.join(pio, 'nextpnr-ice40')
+        yosys         = os.path.join(pio, 'yosys')
+        iceprog       = os.path.join(pio, 'iceprog')
+    # Otherwise, assume the tools are in the PATH.
+    else:
+        icepack       = 'icepack'
+        icemulti      = 'icemulti'
+        arachne_pnr   = 'arachne-pnr'
+        nextpnr_ice40 = 'nextpnr-ice40'
+        yosys         = 'yosys'
+        iceprog       = 'iceprog'
+
+
+#######################################
+## Build an FPGA Bitstream
+#######################################
+def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48'):
+    """Build an FPGA Bitstream for an iCE40 FPGA.
+
+    Args:
+       name (string): Name of the top module for verilog synthesis (default: "top")
+       pcf (string): Filename of the PCF pin definitions file (default: "top.pcf")
+       device (string): nextpnr argument to select the FPGA family (defualt: "--up5k")
+       package (string): Package type of the FPGA (default: "sg48")
+       *args (string): All other non-kwargs should provide the verilog files to be synthesized.
+    """
+    synth_cmd = 'synth_ice40 -top ' + name + ' -json ' + name + '.json'
+    if call([yosys, '-q', '-p', synth_cmd] + [os.path.join(srcdir, x) for x in args] ) != 0:
+        return
+    if call([nextpnr_ice40, device, '--package', package, '--opt-timing', '--pcf', pcf, '--json', name+'.json', '--asc', name+'.asc']) != 0:
+        return
+    if call([icepack, name+'.asc', name+'.bin']) != 0:
+        return
+
+#######################################
+## Cleanup After Ourselves
+#######################################
+def clean():
+    del_files = glob('*.bin')+glob('*.blif')+glob('*.rpt')+glob('*.asc') + glob('*.json')
+    for del_file in del_files:
+        os.remove(del_file)
+
+#######################################
+## Generate Memory Blocks
+#######################################
+def generate():
+    call(["python3", "generate_luts.py"])
+
 def main():
     # Parse command-line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', nargs='*', default=['build'], help='build|upload|clean')
+    parser.add_argument('command', metavar='COMMAND', nargs='*', default=['build'],
+                        help="Make target to run, one of build|clean|generate|bootloader|multiboot|upload|iceprog")
     args = parser.parse_args()
-
-    # Implement case insensitive commands
-    commands = args.command
 
     # Name of the Verilog source file *without* the ".v" extension
     name = 'top'
-
-    pcf_file = "Prototype2_hardware.pcf"
     
-    # Platform-specific path to IceStorm tools
-    if os.name=='nt':
-        pio_rel = '.apio\\packages'
-        #pio_rel = '.platformio\\packages\\toolchain-icestorm\\bin'
-        home_path = os.getenv('HOMEPATH')
-
-        # Build the full path to IceStorm tools
-        pio = os.path.join(home_path, pio_rel)
-    
-        # Tools used in the flow
-        icepack       = os.path.join(pio, 'toolchain-ice40\\bin\\icepack.exe')
-        icemulti      = os.path.join(pio, 'toolchain-ice40\\bin\\icemulti.exe')
-        arachne_pnr   = os.path.join(pio, 'toolchain-ice40\\bin\\arachne-pnr.exe')
-        nextpnr_ice40 = os.path.join(pio, 'toolchain-ice40\\bin\\nextpnr-ice40.exe')
-        yosys         = os.path.join(pio, 'toolchain-yosys\\bin\\yosys.exe')
-        iceprog       = os.path.join(pio, 'toolchain-ice40\\bin\\iceprog.exe')
-        tinyprog      = 'tinyprog'
-
-    else:
-        pio_rel = '.platformio/packages/toolchain-icestorm/bin'
-        home_path = os.environ['HOME']
-        file_ext = ''
-    
-        # Build the full path to IceStorm tools
-        pio = os.path.join(home_path, pio_rel)
-        
-        # Tools used in the flow
-        icepack       = os.path.join(pio, 'icepack'+file_ext)
-        icemulti      = os.path.join(pio, 'icemulti'+file_ext)
-        arachne_pnr   = os.path.join(pio, 'arachne-pnr'+file_ext)
-        nextpnr_ice40 = os.path.join(pio, 'nextpnr-ice40'+file_ext)
-        yosys         = os.path.join(pio, 'yosys'+file_ext)
-        iceprog       = os.path.join(pio, 'iceprog'+file_ext)
-        tinyprog      = 'tinyprog'
-
-    sources = glob('*.v')
-    sources += ["usb/edge_detect.v",
-                "usb/strobe.v",
-                "usb/usb_fs_in_arb.v",
-                "usb/usb_fs_in_pe.v",
-                "usb/usb_fs_out_arb.v",
-                "usb/usb_fs_out_pe.v",
-                "usb/usb_fs_pe.v",
-                "usb/usb_fs_rx.v",
-                "usb/usb_fs_tx_mux.v",
-                "usb/usb_fs_tx.v",
-                "usb/usb_dfu_app_ep.v",
-                "usb/usb_dfu_core.v",
-                "usb/usb_phy_ice40.v"]
-
-    for command in commands:
+    for command in args.command:
         # run command
         if command == 'build':
-            synth_cmd = 'synth_ice40 -top top -json ' + name + '.json'
-            if call([yosys, '-q', '-p', synth_cmd] + sources) != 0:
-                return
-            if call([nextpnr_ice40, '--up5k', '--package', 'sg48', '--opt-timing', '--pcf', pcf_file, '--json', name+'.json', '--asc', name+'.asc']) != 0:
-                return
-            if call([icepack, name+'.asc', 'top.bin']) != 0:
+            generate()
+            build(*sources, name='top', pcf=pcf_file)
+        
+        elif command == 'generate':
+            generate()
+
+        elif command == 'bootloader':
+            build('bootloader/firstboot.v', name='firstboot', pcf=pcf_file)
+            build(*boot_srcs, name='tinydfu', pcf=pcf_file)
+        
+        elif command == 'multiboot':
+            if call([icemulti, '-v', '-o', 'multiboot.bin', '-a15', 'firstboot.bin', 'tinydfu.bin', 'top.bin']) != 0:
                 return
 
-            # make multiboot.bin
-            #if call([icemulti, "-v", "-o", "multiboot.bin", "-p0", "-A15", 'firstboot.bin', 'bootloader/tinydfu.bin', 'top.bin']) != 0:
-            #    return
-
-
-            
         elif command == 'upload':
-            if call(['dfu-util', '-a2', '-D', name+'.bin', '-R']) != 0:
+            if call(['dfu-util', '-a0', '-D', name+'.bin', '-R']) != 0:
                 return
         
         elif command == 'iceprog':
-            if call([iceprog, 'top.bin']) != 0:
+            if call([iceprog, 'multiboot.bin']) != 0:
                 return
         
         elif command == 'iceread':
-            if call([iceprog, '-R', "1M", name+'.bin_readout']) != 0:
+            if call([iceprog, '-R', "1M", 'readout.bin']) != 0:
                 return
-        
-        elif command == 'iceproghelp':
-            if call([iceprog, '-p', name+'.bin', '-IA', '--help']) != 0:
-                return
-        
+
         elif command == 'clean':
-            del_files = glob('*.bin')+glob('*.blif')+glob('*.rpt')+glob('*.asc') + [name+'.json']
-            for del_file in del_files:
-                os.remove(del_file)
+            clean()
             
         else:
             raise Exception('Invalid command')

@@ -23,7 +23,7 @@ reg [1:0] clkdiv = 0;
 
 // Use an icepll generated pll
 wire clk_locked;
-pll pll48( .clock_in(pin_clk), .clock_out(clk_48mhz), .locked( clk_locked ) );
+pll48mhz pll( .refclk(pin_clk), .clk_48mhz(clk_48mhz), .clk_locked(clk_locked) );
 always @(posedge clk_48mhz) clkdiv <= clkdiv + 1;
 
 wire rst;
@@ -36,12 +36,12 @@ assign rst = (rst_delay != 0);
 // Image Slot 0: Multiboot header and POR springboard.
 // Image Slot 1: This Image (DFU Bootloader).
 // Image Slot 2: User Application.
-wire usb_reset;
+wire dfu_detach;
 wire [7:0] dfu_state;
 SB_WARMBOOT warmboot_inst (
     .S1(1'b1),
     .S0(1'b0),
-    .BOOT(!rst && (dfu_state == 8'h01) && usb_reset)
+    .BOOT(!rst && dfu_detach)
 );
 
 /////////////////////////////
@@ -72,14 +72,12 @@ usb_dfu_core dfu (
     .spi_mosi( pin_mosi ),
     .spi_miso( pin_miso ),  
 
+    .dfu_detach( dfu_detach ),
     .dfu_state( dfu_state )
 );
 
 // USB Physical interface
 usb_phy_ice40 phy (
-    .clk (clk),
-    .reset (usb_reset),
-
     .pin_usb_p (pin_usbp),
     .pin_usb_n (pin_usbn),
 

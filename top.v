@@ -79,40 +79,10 @@ module top (
 
 
   wire mem_busy;
-  wire dfu_busy;
-  wire dfu_idle;
-  wire dfu_usb_to_flash;
-  wire dfu_flash_to_usb;
 
   wire flash_busy;
-  assign flash_busy = mem_busy | dfu_busy;
+  assign flash_busy = mem_busy;
   
-  localparam DFU_STATE_appIDLE                = 'h00;
-  localparam DFU_STATE_appDETACH              = 'h01;
-  localparam DFU_STATE_dfuIDLE                = 'h02;
-  localparam DFU_STATE_dfuDNLOAD_SYNC         = 'h03;
-  localparam DFU_STATE_dfuDNBUSY              = 'h04;
-  localparam DFU_STATE_dfuDNLOAD_IDLE         = 'h05;
-  localparam DFU_STATE_dfuMANIFEST_SYNC       = 'h06;
-  localparam DFU_STATE_dfuMANIFEST            = 'h07;
-  localparam DFU_STATE_dfuMANIFEST_WAIT_RESET = 'h08;
-  localparam DFU_STATE_dfuUPLOAD_IDLE         = 'h09;
-  localparam DFU_STATE_dfuERROR               = 'h0a;
-
-  wire dfu_detach;
-  wire [7:0] dfu_state;
-  assign dfu_idle = (dfu_state == DFU_STATE_appIDLE   ||
-                     dfu_state == DFU_STATE_appDETACH ||
-                     dfu_state == DFU_STATE_dfuIDLE);
-  assign dfu_busy = !dfu_idle;
-
-  assign dfu_usb_to_flash = (dfu_state == DFU_STATE_dfuDNLOAD_SYNC |
-                             dfu_state == DFU_STATE_dfuDNBUSY |
-                             dfu_state == DFU_STATE_dfuDNLOAD_IDLE);
-
-  assign dfu_flash_to_usb = (dfu_state == DFU_STATE_dfuUPLOAD_IDLE);
-  
-
   wire       frame_complete;
     
   ////////////////////////////////////////////////////////////////////////////////
@@ -124,32 +94,12 @@ module top (
   ////////////////////////////////////////////////////////////////////////////////
   wire clk_48mhz;
   wire clk_locked;
-  SB_PLL40_CORE #(
-      .DIVR(4'd0),
-      .DIVF(7'd63), // was 47 - 7'b0101111 = 0x2F (31 for first prototype)
-      .DIVQ(3'd4),
-      .FILTER_RANGE(3'd1),
-      .FEEDBACK_PATH("SIMPLE"),
-      .DELAY_ADJUSTMENT_MODE_FEEDBACK("FIXED"),
-      .FDA_FEEDBACK(4'd0),
-      .DELAY_ADJUSTMENT_MODE_RELATIVE("FIXED"),
-      .FDA_RELATIVE(4'd0),
-      .SHIFTREG_DIV_MODE(2'd0),
-      .PLLOUT_SELECT("GENCLK"),
-      .ENABLE_ICEGATE(1'b0)
-  ) usb_pll_inst (
-      .REFERENCECLK(pin_clk),
-      .PLLOUTCORE(clk_48mhz),
-      .PLLOUTGLOBAL(),
-      .EXTFEEDBACK(),
-      .RESETB(1'b1),
-      .BYPASS(1'b0),
-      .LATCHINPUTVALUE(),
-      .LOCK(clk_locked),
-      .SDI(),
-      .SDO(),
-      .SCLK()
+  pll48mhz pll(
+    .refclk(pin_clk),
+    .clk_48mhz(clk_48mhz),
+    .clk_locked(clk_locked)
   );
+
   wire lf_clk;
   SB_LFOSC LF_OscInst (
     .CLKLFPU (1),
@@ -157,7 +107,6 @@ module top (
     .CLKLF   (lf_clk)
   );
 
-    
   // Generate reset signal
   reg [3:0]     reset_cnt = 7;
   reg           reset;
@@ -351,7 +300,7 @@ module top (
     .ack_o ( mem_ack  ),
     .cti_i ( cti      ),
 
-    .dfu_busy  ( dfu_busy ),
+    .dfu_busy  (  ),
     .mem_busy  ( mem_busy ),
     
     .spi_clk   ( mem_spi_sck   ),
@@ -446,8 +395,10 @@ module top (
   wire usb_n_rx;
   wire usb_tx_en;
   
+  wire dfu_detach;
+
   // usb DFU - this instanciates the entire USB device.
-  usb_dfu_core dfu (
+  usb_dfu_stub dfu (
     .clk_48mhz (clk_48mhz),
     .clk       (clk),
     .reset     (reset),
@@ -461,7 +412,6 @@ module top (
 
      // DFU state and debug
     .dfu_detach(dfu_detach),
-    .dfu_state (dfu_state),
     .debug     ()
   );
 
