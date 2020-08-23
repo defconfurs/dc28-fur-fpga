@@ -11,9 +11,40 @@ module tinydfu (
     inout wire  pin_miso,
     inout wire  pin_mosi,
     output wire pin_cs,
-    output wire pin_sck
+    output wire pin_sck,
+
+    output wire pin_stat_r,
+    output wire pin_stat_g,
+    output wire pin_stat_b
 );
 
+
+wire          stat_r;
+wire          stat_g;
+wire          stat_b;
+wire          stat_en;
+
+SB_RGBA_DRV #(
+  .CURRENT_MODE ( "0b1"        ), // half current mode
+  .RGB0_CURRENT ( "0b00000001" ),
+  .RGB1_CURRENT ( "0b00000001" ),
+  .RGB2_CURRENT ( "0b00000001" )
+) rgb_drv_inst (
+  .RGBLEDEN ( stat_en    ),
+  .CURREN   ( stat_en    ),
+  .RGB0PWM  ( stat_r     ),
+  .RGB1PWM  ( stat_g     ),
+  .RGB2PWM  ( stat_b     ),
+  .RGB0     ( pin_stat_r ),
+  .RGB1     ( pin_stat_g ),
+  .RGB2     ( pin_stat_b )
+);
+
+assign stat_r = 1;
+assign stat_g = 0;
+assign stat_b = 1;
+assign stat_en = 1;
+  
 /////////////////////////////
 // Clock and Reset Generation
 /////////////////////////////
@@ -39,7 +70,7 @@ assign rst = (rst_delay != 0);
 wire dfu_detach;
 wire [7:0] dfu_state;
 SB_WARMBOOT warmboot_inst (
-    .S1(1'b1),
+    .S1(1'b0),
     .S0(1'b0),
     .BOOT(!rst && dfu_detach)
 );

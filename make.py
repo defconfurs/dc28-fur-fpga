@@ -107,6 +107,34 @@ def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48'):
         return
 
 #######################################
+## Checks if rebuild needed
+#######################################
+def check_rebuild(*args, name='top', pcf='top.pcf'):
+    """Build an FPGA Bitstream for an iCE40 FPGA.
+
+    Args:
+       name (string): Name of the top module for verilog synthesis (default: "top")
+       pcf (string): Filename of the PCF pin definitions file (default: "top.pcf")
+       device (string): nextpnr argument to select the FPGA family (defualt: "--up5k")
+       package (string): Package type of the FPGA (default: "sg48")
+       *args (string): All other non-kwargs should provide the verilog files to be synthesized.
+    """
+    bitfile = name+'.bin'
+    
+    if not os.path.exists(bitfile):
+        return True
+
+    bit_mtime = os.path.getmtime(bitfile)
+    if os.path.getmtime(pcf) > bit_mtime:
+        return True
+    for x in args:
+        if os.path.getmtime(os.path.join(srcdir, x)) > bit_mtime:
+            return True
+
+    return False
+
+    
+#######################################
 ## Cleanup After Ourselves
 #######################################
 def clean():
@@ -123,13 +151,32 @@ def generate():
 def main():
     # Parse command-line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', metavar='COMMAND', nargs='*', default=['build'],
+    parser.add_argument('command', metavar='COMMAND', nargs='*', default=['auto'],
                         help="Make target to run, one of build|clean|generate|bootloader|multiboot|upload|iceprog")
     args = parser.parse_args()
 
     # Name of the Verilog source file *without* the ".v" extension
     name = 'top'
-    
+
+    if args.command[0] == 'auto':
+        newstuff = []
+        
+        # check firstboot
+        if (check_rebuild('bootloader/firstboot.v', name='firstboot', pcf=pcf_file) or
+            check_rebuild(*boot_srcs, name='tinydfu', pcf=pcf_file)):
+            newstuff += ['bootloader']
+            
+        # check main build
+        if check_rebuild(*sources, name='top', pcf=pcf_file):
+            newstuff += ['build']
+
+        if len(newstuff) > 0:
+            newstuff += ['multiboot']
+
+        # get rid of the auto
+        args.command = newstuff + args.command[1:]
+
+        
     for command in args.command:
         # run command
         if command == 'build':
@@ -139,7 +186,7 @@ def main():
         elif command == 'generate':
             generate()
 
-        elif command == 'bootloader':
+        elif command == 'bootloader' or command == "booploader":
             build('bootloader/firstboot.v', name='firstboot', pcf=pcf_file)
             build(*boot_srcs, name='tinydfu', pcf=pcf_file)
         
@@ -148,7 +195,7 @@ def main():
                 return
 
         elif command == 'upload':
-            if call(['dfu-util', '-a0', '-D', name+'.bin', '-R']) != 0:
+            if call(['dfu-util', '-e', '-a0', '-D', name+'.bin', '-R']) != 0:
                 return
         
         elif command == 'iceprog':
@@ -163,7 +210,7 @@ def main():
             clean()
             
         else:
-            raise Exception('Invalid command')
+            raise Exception('Invalid command', command)
 
 if __name__=='__main__':
     main()

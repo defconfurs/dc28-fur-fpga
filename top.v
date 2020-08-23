@@ -37,19 +37,48 @@ module top (
     input wire  pin_button_up,
     input wire  pin_button_down,
 
+    output wire pin_stat_r,
+    output wire pin_stat_g,
+    output wire pin_stat_b,
+            
     // addon header
-    //                            GND        
-    input wire pin_iob_9b, //  pin 3
-    input wire pin_iob_8a, //  pin 4
-    input wire pin_iob_13b, // pin 6
+    //                            GND
+    output wire  pin_iob_9b, //  pin 3
+    output wire  pin_iob_8a, //  pin 4
+    output wire  pin_iob_13b, // pin 6
     //                           +3.3V
 
-    input wire pin_iot_38b, // pin 27
-    input wire pin_iob_29b, // pin 19
-    input wire pin_iob_23b  // pin 21
+    input wire  pin_iot_38b, // pin 27
+    input wire  pin_iob_29b, // pin 19
+    input wire  pin_iob_23b  // pin 21
   );
 
-  
+  wire          stat_r;
+  wire          stat_g;
+  wire          stat_b;
+  wire          stat_en;
+
+  SB_RGBA_DRV #(
+    .CURRENT_MODE ( "0b1"        ), // half current mode
+    .RGB0_CURRENT ( "0b00000000" ), // 4mA
+    .RGB1_CURRENT ( "0b00000000" ),
+    .RGB2_CURRENT ( "0b00000000" )
+  ) rgb_drv_inst (
+    .RGBLEDEN ( stat_en    ),
+    .CURREN   ( stat_en    ),
+    .RGB0PWM  ( stat_r     ),
+    .RGB1PWM  ( stat_g     ),
+    .RGB2PWM  ( stat_b     ),
+    .RGB0     ( pin_stat_r ),
+    .RGB1     ( pin_stat_g ),
+    .RGB2     ( pin_stat_b )
+  );
+
+  assign stat_r = 0;
+  assign stat_g = 1;
+  assign stat_b = 0;
+  assign stat_en = 1;
+
   wire [15:0]   debug;
     
   wire [3:0]    latch_row_bank;
@@ -149,7 +178,10 @@ module top (
   wire rst;
   assign clk = clk_12mhz;
   assign rst = reset;
-  
+
+  assign pin_iob_9b = clk_48mhz;
+  assign pin_iob_8a = clk;
+  assign pin_iob_13b = rst;
   
   //---------------------------------------------------------------
   // Wishbone arbitration connections
@@ -463,7 +495,7 @@ module top (
 
   
   generate
-    if (1) begin // flag to switch between the LED test pattern (0) and VU meter (1)
+    if (0) begin // flag to switch between the LED test pattern (0) and VU meter (1)
       test_intensity #(
         .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1024)
       )test_pattern_inst (
