@@ -183,39 +183,49 @@ module led_matrix #(
   localparam FIELD_GREEN = 3'b010;
   localparam FIELD_BLUE  = 3'b100;
   reg [2:0] current_field = FIELD_BLUE;
+  
+  reg [5:0] pixel_out;
 
+  always @(*) begin
+    case (current_field)
+    FIELD_RED:   pixel_out <= { raminst_data_out[15:11], 1'b0 };
+    FIELD_GREEN: pixel_out <= { raminst_data_out[10:5] };
+    FIELD_BLUE:  pixel_out <= { raminst_data_out[4:0], 1'b0 };
+    default:     pixel_out <= { raminst_data_out[4:0], 1'b0 };
+    endcase
+  end
   
   reg [N_ROWS_SIZE:0]          pixel_being_updated = 0;
   reg [N_COLS_SIZE-1:0]        current_col = 0;
   
   //===========================================================================================
-  // Select component
+  // Nonlinear timer
+  reg [7:0] brightness_lut_out;
+  reg [7:0] brightness_lut_mem [63:0];
 
-  // this both grabs the component of the 565 encoded value as well as
-  // prepending it with the offset into the LUT for the field region
-  reg [7:0] field_lut_addr = 0;
-  always @(*) begin
-    case (current_field)
-    FIELD_RED:   field_lut_addr = { 2'b00, ram_data_out[15:11], 1'b0 };
-    FIELD_GREEN: field_lut_addr = { 2'b01, ram_data_out[10:5] };
-    FIELD_BLUE:  field_lut_addr = { 2'b10, ram_data_out[4:0], 1'b0 };
-    default: field_lut_addr     = 8'd0;
-    endcase
-  end
-  
-  //===========================================================================================
-  // Nonlinear lookup
-  localparam PIXEL_TIMER_SIZE = 16;
-  reg [15:0] brightness_lut_out;
-  
-  reg [PIXEL_TIMER_SIZE-1:0]  brightness_lut_mem [255:0];
+  reg [7:0] pwm_pos_timer;
+  reg [5:0] pwm_pos;
   
   initial begin
     $readmemh("./brightness_lut_rom.txt", brightness_lut_mem);
   end
   
   always @(posedge clk) begin
-    brightness_lut_out <= brightness_lut_mem[field_lut_addr];
+    brightness_lut_out <= brightness_lut_mem[pwm_pos];
+  end
+  
+  always @(posedge clk) begin
+    if (col_timer) begin
+      if (pwm_pos_timer) pwm_pos_timer <= pwm_pos_timer - 1;
+      else if (pwm_pos < 63) begin
+        pwm_pos <= pwm_pos + 1;
+        pwm_pos_timer <= brightness_lut_out;
+      end
+    end
+    else begin
+      pwm_pos <= 0;
+      pwm_pos_timer <= 1;
+    end
   end
   
   
@@ -239,28 +249,35 @@ module led_matrix #(
 
   assign ram_address = (latched_frame_address + 
                         { ypos, xpos[4:1], xpos[0]^ypos[0] });
-  
-  reg [PIXEL_TIMER_SIZE-1:0]   pixel_timers [0:(N_ROWS<<1)-1];
-  reg [PIXEL_TIMER_SIZE-1:0]   pixel_timers_active [0:(N_ROWS<<1)-1];
-  integer pdm_i;
-  always @(posedge clk) begin
-      for (pdm_i = 0; pdm_i < N_ROWS<<1; pdm_i = pdm_i+1) begin
-          if (col_timer) begin
-              if (pixel_timers_active[pdm_i]) begin
-                  pixel_timers_active[pdm_i] <= pixel_timers_active[pdm_i] - 1;
-                  led_out_state[pdm_i]       <= 1;
-              end
-              else begin
-                  led_out_state[pdm_i] <= 0;
-              end
-          end
-          else begin
-              pixel_timers_active[pdm_i] <= pixel_timers[pdm_i];
-              led_out_state[pdm_i] <= 0;
-          end
-      end
-  end
 
+
+  //==============================
+  // PWM engine
+  reg [5:0]  latched_pixels[0:(N_ROWS<<1)-1];
+  wire       col_timer_active = |col_timer;
+  reg        last_col_timer_active;
+  integer pix_i;
+  always @(posedge clk) begin
+    last_col_timer_active <= col_timer_active;
+
+    if (last_col_timer_active != col_timer_active && col_timer_active) begin
+      for (pix_i = 0; pix_i < N_ROWS<<1; pix_i = pix_i+1) begin
+        if (latched_pixels[pix_i] != 0) led_out_state[pix_i] <= 1;
+      end
+    end
+    else if (col_timer) begin
+      for (pix_i = 0; pix_i < N_ROWS<<1; pix_i = pix_i+1) begin
+        if (latched_pixels[pix_i] == pwm_pos) led_out_state[pix_i] <= 0;
+      end
+    end
+    else begin
+      for (pix_i = 0; pix_i < N_ROWS<<1; pix_i = pix_i+1) begin
+        led_out_state[pix_i] <= 0;
+      end
+    end
+  end
+  //==============================
+  
   
   integer i;
   always @(posedge clk or posedge rst) begin
@@ -272,7 +289,7 @@ module led_matrix #(
       current_col           <= 0;
       pixel_being_updated   <= 0;
       latched_frame_address <= 0;
-      for (i = 0; i < N_ROWS<<1; i = i+1) pixel_timers[i] <= 0;
+      for (i = 0; i < N_ROWS<<1; i = i+1) latched_pixels[i] <= 0;
     end
     
     else begin
@@ -307,7 +324,7 @@ module led_matrix #(
           
           for (i = 0; i < N_ROWS<<1; i = i+1) begin
             if (i == pixel_being_updated) begin
-              pixel_timers[i] <= brightness_lut_out;
+              latched_pixels[i] <= pixel_out;
             end
           end
           
