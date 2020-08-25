@@ -53,6 +53,12 @@ module top (
     input wire  pin_iob_23b  // pin 21
   );
 
+  localparam WB_DATA_WIDTH = 32;
+  localparam WB_SEL_WIDTH  = (WB_DATA_WIDTH / 8);
+  localparam WB_ADDR_WIDTH = 32 - $clog2(WB_SEL_WIDTH);
+  localparam WB_MUX_WIDTH  = 4;
+  
+  
   wire          stat_r;
   wire          stat_g;
   wire          stat_b;
@@ -73,10 +79,6 @@ module top (
     .RGB1     ( pin_stat_g ),
     .RGB2     ( pin_stat_b )
   );
-
-  assign stat_r = 0;
-  assign stat_g = 1;
-  assign stat_b = 0;
   assign stat_en = 1;
 
   wire [15:0]   debug;
@@ -161,69 +163,175 @@ module top (
   wire clk;
   wire rst;
   localparam CLK_FREQ = 24000000;
-  assign clk = clk_24mhz;
+  assign clk = clk_12mhz;
   assign rst = reset;
 
   assign pin_iob_9b = clk_48mhz;
   assign pin_iob_8a = clk;
   assign pin_iob_13b = rst;
-  
-  //---------------------------------------------------------------
-  // Wishbone arbitration connections
-  reg [15:0] data_in;
-  wire       ack;
-  
-  reg [15:0] led_data;
-  reg        led_ack;
-  
-  wire [15:0] mem2_data;
-  wire        mem2_ack;
-
-  assign ack = |{led_ack};
-  
-  always @(*) begin
-    if      (led_ack)    begin  data_in = led_data;    end
-    else if (mem2_ack)   begin  data_in = mem2_data;   end
-    else                 begin  data_in = 16'd0;       end
-  end
-
-    
-  // the blocking mechanism is pretty simple. If any device is
-  // currently using the bus, block everything else
-  wire        cycle;
-  reg [15:0]  adr;
-  reg [15:0]  data;
-  reg         we;
-  reg [1:0]   sel;
-  reg         stb;
-  reg [2:0]   cti;
-    
-  wire        tpat_cycle;
-  wire        tpat_cycle_in;
-  wire [15:0] tpat_adr;
-  wire [15:0] tpat_data;
-  wire        tpat_we;
-  wire [1:0]  tpat_sel;
-  wire        tpat_stb;
-  wire [2:0]  tpat_cti;
-  
-  //assign rs232_cycle_in   = tpat_cycle;
-  assign tpat_cycle_in    = 0;
-
-  assign cycle = tpat_cycle;
-    
-  always @(*) begin
-    //if      (rs232_cycle)    begin  adr = rs232_adr;     data = rs232_data;     we = rs232_we;     sel = rs232_sel;     stb = rs232_stb;     cti = rs232_cti;    end
-    if (tpat_cycle)     begin  adr =    tpat_adr;   data =    tpat_data;   we =    tpat_we;   sel =    tpat_sel;   stb =    tpat_stb;   cti =    tpat_cti;  end
-    else                begin  adr =       16'd0;   data =        16'd0;   we =          0;   sel =           0;   stb =           0;   cti =        3'd0;  end
-  end
 
   
   //---------------------------------------------------------------
-  assign mem2_data = 0;
-  assign mem2_ack = 0;
+  // CPU wishbone components
+  wire [WB_ADDR_WIDTH-1:0] wb_serial_addr;
+  wire [WB_DATA_WIDTH-1:0] wb_serial_rdata;
+  wire [WB_DATA_WIDTH-1:0] wb_serial_wdata;
+  wire                     wb_serial_we;
+  wire [WB_SEL_WIDTH-1:0]  wb_serial_sel;
+  wire                     wb_serial_ack;
+  wire                     wb_serial_cyc;
+  wire                     wb_serial_stb;
+  
+  // Wishbone connected LED driver.
+  wire [WB_ADDR_WIDTH-1:0] wb_ledpwm_addr;
+  wire [WB_DATA_WIDTH-1:0] wb_ledpwm_rdata;
+  wire [WB_DATA_WIDTH-1:0] wb_ledpwm_wdata;
+  wire                     wb_ledpwm_we;
+  wire [WB_SEL_WIDTH-1:0]  wb_ledpwm_sel;
+  wire                     wb_ledpwm_ack;
+  wire                     wb_ledpwm_cyc;
+  wire                     wb_ledpwm_stb;
+
+  // Instantiate the boot ROM.
+  wire [WB_ADDR_WIDTH-1:0] wb_bootrom_addr;
+  wire [WB_DATA_WIDTH-1:0] wb_bootrom_rdata;
+  wire [WB_DATA_WIDTH-1:0] wb_bootrom_wdata;
+  wire                     wb_bootrom_we;
+  wire [WB_SEL_WIDTH-1:0]  wb_bootrom_sel;
+  wire                     wb_bootrom_ack;
+  wire                     wb_bootrom_cyc;
+  wire                     wb_bootrom_stb;
+
+  // Instantiate the SRAM.
+  wire [WB_ADDR_WIDTH-1:0] wb_sram_addr;
+  wire [WB_DATA_WIDTH-1:0] wb_sram_rdata;
+  wire [WB_DATA_WIDTH-1:0] wb_sram_wdata;
+  wire                     wb_sram_we;
+  wire [WB_SEL_WIDTH-1:0]  wb_sram_sel;
+  wire                     wb_sram_ack;
+  wire                     wb_sram_cyc;
+  wire                     wb_sram_stb;
+
+  // Access to the display
+  wire [WB_ADDR_WIDTH-1:0] wb_display_addr;
+  wire [WB_DATA_WIDTH-1:0] wb_display_rdata;
+  wire [WB_DATA_WIDTH-1:0] wb_display_wdata;
+  wire                     wb_display_we;
+  wire [WB_SEL_WIDTH-1:0]  wb_display_sel;
+  wire                     wb_display_ack;
+  wire                     wb_display_cyc;
+  wire                     wb_display_stb;
+
+  // Instruction Bus wishbone signals (classic)
+  wire [WB_ADDR_WIDTH-1:0] wbc_ibus_addr;
+  wire [WB_DATA_WIDTH-1:0] wbc_ibus_rdata;
+  wire [WB_DATA_WIDTH-1:0] wbc_ibus_wdata;
+  wire                     wbc_ibus_we;
+  wire [WB_SEL_WIDTH-1:0]  wbc_ibus_sel;
+  wire                     wbc_ibus_ack;
+  wire                     wbc_ibus_cyc;
+  wire                     wbc_ibus_stb;
+  wire                     wbc_ibus_err;
+  wire [1:0]               wbc_ibus_bte;
+  wire [2:0]               wbc_ibus_cti;
+  
+  // Data Bus wishbone signals (classic)
+  wire [WB_ADDR_WIDTH-1:0] wbc_dbus_addr;
+  wire [WB_DATA_WIDTH-1:0] wbc_dbus_rdata;
+  wire [WB_DATA_WIDTH-1:0] wbc_dbus_wdata;
+  wire                     wbc_dbus_we;
+  wire [WB_SEL_WIDTH-1:0]  wbc_dbus_sel;
+  wire                     wbc_dbus_ack;
+  wire                     wbc_dbus_cyc;
+  wire                     wbc_dbus_stb;
+  wire                     wbc_dbus_err;
+  wire [1:0]               wbc_dbus_bte;
+  wire [2:0]               wbc_dbus_cti;
 
   
+  // Create the Wishbone crossbar.
+  wbcxbar#(
+    .NM(2), // One port each for instruction and data access from the CPU.
+    .NS(4), // One port for SRAM, boot ROM and PWM LED driver.
+    .AW(WB_ADDR_WIDTH),
+    .DW(WB_DATA_WIDTH),
+    .MUXWIDTH(4),
+    .SLAVE_MUX({
+        { 4'h0 },  // Base address of the boot ROM.
+        { 4'h1 },  // Base address of the SRAM.
+        { 4'h2 },  // Base address of the PWM driver.
+        { 4'h3 },  // Base address of the USB Serial interface.
+        { 4'h4 }   // Base address of the LED Driver interface.
+    })
+  ) vexcrossbar (
+    .i_clk  ( clk ),
+    .i_reset( rst ),
+
+    // Crossbar Master Ports.
+    .i_mcyc  ({ wbc_ibus_cyc,   wbc_dbus_cyc   }),
+    .i_mstb  ({ wbc_ibus_stb,   wbc_dbus_cyc   }),
+    .i_mwe   ({ wbc_ibus_we,    wbc_dbus_we    }),
+    .i_maddr ({ wbc_ibus_addr,  wbc_dbus_addr  }),
+    .i_mdata ({ wbc_ibus_wdata, wbc_dbus_wdata }),
+    .i_msel  ({ wbc_ibus_sel,   wbc_dbus_sel   }),
+    .o_mack  ({ wbc_ibus_ack,   wbc_dbus_ack   }),
+    .o_merr  ({ wbc_ibus_err,   wbc_dbus_err   }),
+    .o_mdata ({ wbc_ibus_rdata, wbc_dbus_rdata }),
+
+    // Crossbar Slave Ports.
+    .o_scyc  ({ wb_bootrom_cyc,   wb_sram_cyc,   wb_ledpwm_cyc,   wb_serial_cyc,   wb_display_cyc   }),
+    .o_sstb  ({ wb_bootrom_stb,   wb_sram_stb,   wb_ledpwm_stb,   wb_serial_stb,   wb_display_stb   }),
+    .o_swe   ({ wb_bootrom_we,    wb_sram_we,    wb_ledpwm_we,    wb_serial_we,    wb_display_we    }),
+    .o_saddr ({ wb_bootrom_addr,  wb_sram_addr,  wb_ledpwm_addr,  wb_serial_addr,  wb_display_addr  }),
+    .o_sdata ({ wb_bootrom_wdata, wb_sram_wdata, wb_ledpwm_wdata, wb_serial_wdata, wb_display_wdata }),
+    .o_ssel  ({ wb_bootrom_sel,   wb_sram_sel,   wb_ledpwm_sel,   wb_serial_sel,   wb_display_sel   }),
+    .i_sack  ({ wb_bootrom_ack,   wb_sram_ack,   wb_ledpwm_ack,   wb_serial_ack,   wb_display_ack   }),
+    .i_serr  ({ 1'b0,             1'b0,          1'b0,            1'b0,            1'b0             }),
+    .i_sdata ({ wb_bootrom_rdata, wb_sram_rdata, wb_ledpwm_rdata, wb_serial_rdata, wb_display_rdata })
+  );
+  
+
+  //---------------------------------------------------------------
+  // CPU
+  VexRiscv vexcore(
+    .externalResetVector(32'h00000000),
+    .timerInterrupt(1'b0),
+    .softwareInterrupt(1'b0),
+    .externalInterruptArray(32'h00000000),
+
+    // Instruction Bus.
+    .iBusWishbone_CYC(wbc_ibus_cyc),
+    .iBusWishbone_STB(wbc_ibus_stb),
+    .iBusWishbone_ACK(wbc_ibus_ack),
+    .iBusWishbone_WE(wbc_ibus_we),
+    .iBusWishbone_ADR(wbc_ibus_addr),
+    .iBusWishbone_DAT_MISO(wbc_ibus_rdata),
+    .iBusWishbone_DAT_MOSI(wbc_ibus_wdata),
+    .iBusWishbone_SEL(wbc_ibus_sel),
+    .iBusWishbone_ERR(wbc_ibus_err),
+    .iBusWishbone_BTE(wbc_ibus_bte),
+    .iBusWishbone_CTI(wbc_ibus_cti), 
+
+    // Data Bus.
+    .dBusWishbone_CYC(wbc_dbus_cyc),
+    .dBusWishbone_STB(wbc_dbus_stb),
+    .dBusWishbone_ACK(wbc_dbus_ack),
+    .dBusWishbone_WE(wbc_dbus_we),
+    .dBusWishbone_ADR(wbc_dbus_addr),
+    .dBusWishbone_DAT_MISO(wbc_dbus_rdata),
+    .dBusWishbone_DAT_MOSI(wbc_dbus_wdata),
+    .dBusWishbone_SEL(wbc_dbus_sel),
+    .dBusWishbone_ERR(wbc_dbus_err),
+    .dBusWishbone_BTE(wbc_dbus_bte),
+    .dBusWishbone_CTI(wbc_dbus_cti),
+
+    .clk(clk),
+    .reset(rst)
+  );
+
+
+  
+  //---------------------------------------------------------------
   led_matrix #(
     .ADDRESS_WIDTH   ( 16 ),
     .DATA_WIDTH      ( 16 ),
@@ -234,15 +342,15 @@ module top (
     .rst_i ( rst ),
     .clk_i ( clk ),
   
-    .adr_i ( adr ),
-    .dat_i ( data ),
-    .dat_o ( led_data ),
-    .we_i  ( we ),
-    .sel_i ( sel ),
-    .stb_i ( stb ),
-    .cyc_i ( cycle ),
-    .ack_o ( led_ack ),
-    .cti_i ( cti ),
+    .adr_i ( wb_display_addr[15:0] ),
+    .dat_i ( wb_display_wdata[15:0] ),
+    .dat_o ( {16'd0, wb_display_rdata} ),
+    .we_i  ( wb_display_we ),
+    .sel_i ( wb_display_sel[1:0] ),
+    .stb_i ( wb_display_stb ),
+    .cyc_i ( wb_display_cyc ),
+    .ack_o ( wb_display_ack ),
+    .cti_i ( 0 ),
   
     // LED Drive Out
     .latch_row_bank ( latch_row_bank ),
@@ -257,7 +365,8 @@ module top (
     .debug          ( debug )
   );
 
-  assign debug = { led_ack, cycle, led_data[7:0] };
+  
+  assign debug = { 0 };
 
   
   //---------------------------------------------------------------
@@ -271,84 +380,120 @@ module top (
   
   wire dfu_detach;
 
-  // usb DFU - this instanciates the entire USB device.
-  usb_dfu_stub dfu (
-    .clk_48mhz (clk_48mhz),
-    .clk       (clk),
-    .reset     (reset),
-
-    // pins - these must be connected properly to the outside world.  See below.
+  // USB Serial Core.
+  wb_usb_serial#(
+    .AW(WB_ADDR_WIDTH),
+    .DW(WB_DATA_WIDTH)
+  ) usb_serial(
+    .wb_clk_i  (clk),
+    .wb_reset_i(rst),
+  
+    // Wishbone bus.
+    .wb_adr_i  (wb_serial_addr),
+    .wb_dat_i  (wb_serial_wdata),
+    .wb_dat_o  (wb_serial_rdata),
+    .wb_we_i   (wb_serial_we),
+    .wb_sel_i  (wb_serial_sel),
+    .wb_ack_o  (wb_serial_ack),
+    .wb_cyc_i  (wb_serial_cyc),
+    .wb_stb_i  (wb_serial_stb),
+  
+    // USB lines.
+    .usb_clk   (clk_48mhz),
     .usb_p_tx  (usb_p_tx),
     .usb_n_tx  (usb_n_tx),
     .usb_p_rx  (usb_p_rx),
     .usb_n_rx  (usb_n_rx),
     .usb_tx_en (usb_tx_en),
-
-     // DFU state and debug
+    
+    // DFU state and debug
     .dfu_detach(dfu_detach),
-    .debug     ()
+    .debug()
+  );
+  usb_phy_ice40 usb_phy(
+    .pin_usb_p (pin_usbp),
+    .pin_usb_n (pin_usbn),
+  
+    .usb_p_tx  (usb_p_tx),
+    .usb_n_tx  (usb_n_tx),
+    .usb_p_rx  (usb_p_rx),
+    .usb_n_rx  (usb_n_rx),
+    .usb_tx_en (usb_tx_en)
+  );
+  assign pin_pu = 1'b1;
+
+
+  //---------------------------------------------------------------
+  // wishbone connected LED PWM driver
+  wire [3:0] wb_ledpwm_output;
+  
+  wbledpwm#(
+    .AW(WB_ADDR_WIDTH),
+    .DW(WB_DATA_WIDTH),
+    .NLEDS(4)
+  ) vexledpwm(
+    .wb_clk_i   ( clk ),
+    .wb_reset_i ( rst ),
+    .wb_adr_i   ( wb_ledpwm_addr ),
+    .wb_dat_i   ( wb_ledpwm_wdata ),
+    .wb_dat_o   ( wb_ledpwm_rdata ),
+    .wb_we_i    ( wb_ledpwm_we ),
+    .wb_sel_i   ( wb_ledpwm_sel ),
+    .wb_ack_o   ( wb_ledpwm_ack ),
+    .wb_cyc_i   ( wb_ledpwm_cyc ),
+    .wb_stb_i   ( wb_ledpwm_stb ),
+
+    .leds       ( wb_ledpwm_output )
+  );
+  assign stat_r = wb_ledpwm_output[0];
+  assign stat_g = wb_ledpwm_output[1];
+  assign stat_b = wb_ledpwm_output[2];
+
+  //---------------------------------------------------------------
+  // Boot ROM
+  bootrom#(
+    .AW(WB_ADDR_WIDTH),
+    .DW(WB_DATA_WIDTH)
+  ) vexbootrom(
+    .wb_clk_i  (clk),
+    .wb_reset_i(rst),
+    .wb_adr_i(wb_bootrom_addr),
+    .wb_dat_i(wb_bootrom_wdata),
+    .wb_dat_o(wb_bootrom_rdata),
+    .wb_we_i(wb_bootrom_we),
+    .wb_sel_i(wb_bootrom_sel),
+    .wb_ack_o(wb_bootrom_ack),
+    .wb_cyc_i(wb_bootrom_cyc),
+    .wb_stb_i(wb_bootrom_stb)
   );
 
-
-
+  //---------------------------------------------------------------
+  // SRAM
+  wbsram#(
+    .AW(WB_ADDR_WIDTH),
+    .DW(WB_DATA_WIDTH)
+  ) vexsram(
+    .wb_clk_i(clk),
+    .wb_reset_i(rst),
+    .wb_adr_i(wb_sram_addr),
+    .wb_dat_i(wb_sram_wdata),
+    .wb_dat_o(wb_sram_rdata),
+    .wb_we_i(wb_sram_we),
+    .wb_sel_i(wb_sram_sel),
+    .wb_ack_o(wb_sram_ack),
+    .wb_cyc_i(wb_sram_cyc),
+    .wb_stb_i(wb_sram_stb)
+  );
+  
+  
+  //---------------------------------------------------------------
+  // Audio
 
 
   reg [3:0] audio_volume;
   reg [3:0] audio_peak;
   assign audio_peak = 0;
 
-  generate
-    if (0) begin
-      assign tpat_cycle = 0;
-      assign tpat_adr   = 0;
-      assign tpat_data  = 0;
-      assign tpat_we    = 0;
-      assign tpat_sel   = 0;
-      assign tpat_stb   = 0;
-      assign tpat_cti   = 0;
-    end
-    else begin
-      if (0) begin // flag to switch between the LED test pattern (0) and VU meter (1)
-        test_intensity #(
-          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1)
-        )test_pattern_inst (
-          .rst_i ( rst ),
-          .clk_i ( clk ),
-          .adr_o ( tpat_adr ),
-          .dat_i ( data_in ),
-          .dat_o ( tpat_data ),
-          .we_o  ( tpat_we ),
-          .sel_o ( tpat_sel ),
-          .stb_o ( tpat_stb ),
-          .cyc_i ( tpat_cycle_in ),
-          .cyc_o ( tpat_cycle ),
-          .ack_i ( ack ),
-          .cti_o ( tpat_cti ),
-        
-          .volume_in ( audio_volume ),
-          .peak_in   ( audio_peak )
-        );
-      end
-      else begin
-        test_pattern #(
-          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1 )//`FRAME_MEMORY_START )
-        )test_pattern_inst (
-          .rst_i ( rst ),
-          .clk_i ( clk ),
-          .adr_o ( tpat_adr ),
-          .dat_i ( data_in ),
-          .dat_o ( tpat_data ),
-          .we_o  ( tpat_we ),
-          .sel_o ( tpat_sel ),
-          .stb_o ( tpat_stb ),
-          .cyc_i ( tpat_cycle_in ),
-          .cyc_o ( tpat_cycle ),
-          .ack_i ( ack ),
-          .cti_o ( tpat_cti )
-        );
-      end
-    end
-  endgenerate
 
   wire signed [11:0] audio1;
   wire               audio_valid;
@@ -369,8 +514,6 @@ module top (
     .audio_valid ( audio_valid )
   );
 
-
-   
   wire [11:0]        abs_audio  = ( audio1 >= 0 ? audio1 : -audio1 );
 
   reg [11:0]         volume_value = 0;
@@ -402,34 +545,6 @@ module top (
   end
 
                    
-  
-
-  assign pin_pu = 1'b1;
-
-  wire usb_p_in;
-  wire usb_n_in;
-  assign usb_p_rx = usb_tx_en ? 1'b1 : usb_p_in;
-  assign usb_n_rx = usb_tx_en ? 1'b0 : usb_n_in;
-    
-  SB_IO #(
-    .PIN_TYPE(6'b 1010_01), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-    .PULLUP(1'b 0)
-  ) iobuf_usbp (
-    .PACKAGE_PIN(pin_usbp),
-    .OUTPUT_ENABLE(usb_tx_en),
-    .D_OUT_0(usb_p_tx),
-    .D_IN_0(usb_p_in)
-  );
-    
-  SB_IO #(
-    .PIN_TYPE(6'b 1010_01), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-    .PULLUP(1'b 0)
-  ) iobuf_usbn (
-    .PACKAGE_PIN(pin_usbn),
-    .OUTPUT_ENABLE(usb_tx_en),
-    .D_OUT_0(usb_n_tx),
-    .D_IN_0(usb_n_in)
-  );
   
 
   // Image Slot 0: Multiboot header and POR springboard.

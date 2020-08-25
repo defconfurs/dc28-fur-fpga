@@ -6,6 +6,7 @@ from subprocess import call
 from glob import glob
 
 srcdir = os.path.dirname(os.path.abspath(__file__))
+libdir = os.path.join(srcdir, "lib")
 
 #######################################
 ## FPGA Source Files
@@ -38,11 +39,18 @@ boot_srcs += [ os.path.join(rtl_usb_dir, x) for x in dfu_usb_srcs ]
 
 # User Bitstream sources.
 stub_usb_srcs = rtl_usb_srcs
-stub_usb_srcs += ["usb_dfu_stub.v",
-                  "usb_dfu_stub_ep.v"]
+stub_usb_srcs += ["usb_serial_core.v",
+                  "usb_serial_ctrl_ep.v",
+                  "usb_uart_in_ep.v",
+                  "usb_uart_out_ep.v"]
+
+lib_srcs = ["VexRiscv_MinRvc.v",
+            "wbcdecoder.v",
+            "wbcxbar.v"]
 
 sources = glob(os.path.join(srcdir, '*.v'))
 sources += [ os.path.join(rtl_usb_dir, x) for x in stub_usb_srcs ]
+sources += [ os.path.join(libdir, x) for x in lib_srcs ]
 
 #######################################
 ## Locate Toolchain Paths
