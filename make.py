@@ -7,6 +7,14 @@ from glob import glob
 
 srcdir = os.path.dirname(os.path.abspath(__file__))
 libdir = os.path.join(srcdir, "lib")
+firmwaredir = os.path.join(srcdir, "firmware")
+ldsfile = os.path.join(firmwaredir,'firmware.lds')
+
+CFLAGS = ['-v','-O2', '-march=rv32ic', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
+CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_FLOAT=1', '-DPRINTF_DISABLE_SUPPORT_EXPONENTIAL=1']
+CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_LONG_LONG=1', '-DPRINTF_DISABLE_SUPPORT_PTRDIFF_T=1']
+LDFLAGS = CFLAGS + ['-Wl,-Bstatic,-T,'+ldsfile+',--gc-sections']
+
 
 #######################################
 ## FPGA Source Files
@@ -52,16 +60,25 @@ sources = glob(os.path.join(srcdir, '*.v'))
 sources += [ os.path.join(rtl_usb_dir, x) for x in stub_usb_srcs ]
 sources += [ os.path.join(libdir, x) for x in lib_srcs ]
 
+
+firmwareFiles = ["start.s",
+                 "main.c",
+                 "printf.c"]
+firmwareSources = [ os.path.join(firmwaredir, x) for x in firmwareFiles ]
+
+
 #######################################
 ## Locate Toolchain Paths
 #######################################
 if os.name=='nt':
     pio_rel = '.apio\\packages'
+    platformio_rel = '.platformio\\packages'
     #pio_rel = '.platformio\\packages\\toolchain-icestorm\\bin'
     home_path = os.getenv('HOMEPATH')
 
     # Build the full path to IceStorm tools
     pio = os.path.join(home_path, pio_rel)
+    platformio = os.path.join(home_path, platformio_rel)
 
     # Tools used in the flow
     icepack       = os.path.join(pio, 'toolchain-ice40\\bin\\icepack.exe')
@@ -70,6 +87,8 @@ if os.name=='nt':
     nextpnr_ice40 = os.path.join(pio, 'toolchain-ice40\\bin\\nextpnr-ice40.exe')
     yosys         = os.path.join(pio, 'toolchain-yosys\\bin\\yosys.exe')
     iceprog       = os.path.join(pio, 'toolchain-ice40\\bin\\iceprog.exe')
+    gcc           = os.path.join(platformio, 'toolchain-riscv\\bin\\riscv64-unknown-elf-gcc.exe')
+    objcopy       = os.path.join(platformio, 'toolchain-riscv\\bin\\riscv64-unknown-elf-objcopy.exe')
 
 else:
     pio_rel = '.platformio/packages/toolchain-icestorm/bin'
@@ -83,6 +102,8 @@ else:
         nextpnr_ice40 = os.path.join(pio, 'nextpnr-ice40')
         yosys         = os.path.join(pio, 'yosys')
         iceprog       = os.path.join(pio, 'iceprog')
+        gcc           = os.path.join(pio, 'riscv64-unknown-elf-gcc')
+        objcopy       = os.path.join(pio, 'riscv64-unknown-elf-objcopy')
     # Otherwise, assume the tools are in the PATH.
     else:
         icepack       = 'icepack'
@@ -91,6 +112,44 @@ else:
         nextpnr_ice40 = 'nextpnr-ice40'
         yosys         = 'yosys'
         iceprog       = 'iceprog'
+        gcc           = 'riscv64-unknown-elf-gcc'
+        objcopy       = 'riscv64-unknown-elf-objcopy'
+
+def hexdump(infile, outfile):
+    with open(outfile, 'w') as hexfile:
+        with open(infile, 'rb') as binfile:
+            while(1):
+                word = binfile.read(4)
+                if (len(word) < 4):
+                    break
+                hexfile.write('%02X%02X%02X%02X\n' % (word[3], word[2], word[1], word[0]))
+        
+
+#######################################
+## Checks if rebuild needed
+#######################################
+def check_rebuild(*args, name='top', pcf='top.pcf'):
+    """Checks if the FPGA bitstream needs to be rebuilt.
+
+    Args:
+       name (string): Name of the top module for verilog synthesis (default: "top")
+       pcf (string): Filename of the PCF pin definitions file (default: "top.pcf")
+       *args (string): All other non-kwargs should provide the verilog files to be synthesized.
+    """
+    bitfile = name+'.bin'
+    
+    if not os.path.exists(bitfile):
+        return True
+
+    bit_mtime = os.path.getmtime(bitfile)
+    if os.path.getmtime(pcf) > bit_mtime:
+        return True
+    for x in args:
+        if os.path.getmtime(os.path.join(srcdir, x)) > bit_mtime:
+            return True
+
+    return False
+
 
 
 #######################################
@@ -115,31 +174,64 @@ def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48'):
         return
 
 #######################################
-## Checks if rebuild needed
+## Check if recompile needed
 #######################################
-def check_rebuild(*args, name='top', pcf='top.pcf'):
-    """Build an FPGA Bitstream for an iCE40 FPGA.
+def check_rebuild_rom(*args, name='firmware'):
+    """Checks if the firmware needs to be rebuilt.
 
     Args:
-       name (string): Name of the top module for verilog synthesis (default: "top")
-       pcf (string): Filename of the PCF pin definitions file (default: "top.pcf")
-       device (string): nextpnr argument to select the FPGA family (defualt: "--up5k")
-       package (string): Package type of the FPGA (default: "sg48")
-       *args (string): All other non-kwargs should provide the verilog files to be synthesized.
+       name (string): Name of the firmware image (default: "firmware.mem")
+       *args (string): All other non-kwargs should provide the source files for the firmware.
     """
-    bitfile = name+'.bin'
-    
-    if not os.path.exists(bitfile):
+    firmwareImage = os.path.join(srcdir, name + '.mem')
+
+    if not os.path.exists(firmwareImage):
         return True
 
-    bit_mtime = os.path.getmtime(bitfile)
-    if os.path.getmtime(pcf) > bit_mtime:
-        return True
+    firmwareTime = os.path.getmtime(firmwareImage)
     for x in args:
-        if os.path.getmtime(os.path.join(srcdir, x)) > bit_mtime:
+        if os.path.getmtime(os.path.join(srcdir, x)) > firmwareTime:
             return True
 
     return False
+    
+#######################################
+## Recompile firmware
+#######################################
+def build_rom(*args, name='firmware'):
+    """Rebuilds the firmware.
+
+    Args:
+       name (string): Name of the firmware image (default: "firmware")
+       *args (string): All other non-kwargs should provide the source files for the firmware.
+    """
+
+    objfiles = []
+    
+    for x in args:
+        infile = os.path.join(firmwaredir, x)
+        outfile = os.path.splitext(infile)[0] + '.o'
+        objfiles += [outfile]
+        
+        if call([gcc] + CFLAGS + ['-c', '-o', outfile, infile]) != 0:
+            print("---- Error compiling ----")
+            return
+
+    #$(CROSS_COMPILE)gcc $(LDFLAGS) -o $@ $^
+    elffile = os.path.join(firmwaredir, name + '.elf')
+    if call([gcc] + LDFLAGS + ['-o', elffile] + objfiles) != 0:
+        print("---- Error compiling ----")
+        return
+
+    #%.bin: %.elf
+    #   $(CROSS_COMPILE)objcopy -O binary $^ $@
+    binfile = os.path.join(firmwaredir, name + '.bin')
+    if call([objcopy, '-O', 'binary', elffile, binfile]) != 0:
+        return
+
+    memfile = os.path.join(srcdir, name + '.mem')
+    hexdump(binfile, memfile)
+    
 
     
 #######################################
@@ -147,6 +239,8 @@ def check_rebuild(*args, name='top', pcf='top.pcf'):
 #######################################
 def clean():
     del_files = glob('*.bin')+glob('*.blif')+glob('*.rpt')+glob('*.asc') + glob('*.json')
+    del_files += glob(os.path.join(firmwaredir, '*.o'))
+    del_files += glob('*.mem') + glob('*.elf')
     for del_file in del_files:
         os.remove(del_file)
 
@@ -168,16 +262,23 @@ def main():
 
     if args.command[0] == 'auto':
         newstuff = []
-        
+
         # check firstboot
         if (check_rebuild('bootloader/firstboot.v', name='firstboot', pcf=pcf_file) or
             check_rebuild(*boot_srcs, name='tinydfu', pcf=pcf_file)):
             newstuff += ['bootloader']
+
+            
+        if check_rebuild_rom(*firmwareSources):
+            newstuff += ['buildrom']
             
         # check main build
         if check_rebuild(*sources, name='top', pcf=pcf_file):
             newstuff += ['build']
-
+        elif 'buildrom' in newstuff:
+            newstuff += ['build']
+            
+            
         if len(newstuff) > 0:
             newstuff += ['multiboot']
 
@@ -190,7 +291,10 @@ def main():
         if command == 'build':
             generate()
             build(*sources, name='top', pcf=pcf_file)
-        
+
+        elif command == 'buildrom':
+            build_rom(*firmwareSources)
+            
         elif command == 'generate':
             generate()
 
