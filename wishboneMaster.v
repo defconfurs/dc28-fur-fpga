@@ -298,7 +298,7 @@ module wishbone_master #(
         // defaults
         current_address_o      = {ADDRESS_WIDTH{1'b0}};
         current_we_o           = 1'b0;
-        current_sel_o          = {DATA_BYTES{1'b0}};
+        current_sel_o          = {DATA_BYTES{1'b1}};
         current_stb_o          = 1'b0;
         current_cycle_o        = 1'b0;
         current_cycle_type_out = 3'b000;

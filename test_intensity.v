@@ -223,7 +223,7 @@ module test_intensity #(
     end
 
     SAVE_STATE_UPDATE_FB_REQUEST: begin
-      next_address    = `MATRIX_START + `MATRIX_ADDR_L;
+      next_address    = `MATRIX_START + `MATRIX_ADDR;
       next_payload_in = FRAME_ADDRESS + (page ? 16'h0400 : 16'h0000);
       next_page   = ~page;
       

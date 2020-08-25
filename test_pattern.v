@@ -2,8 +2,8 @@
 
 module test_pattern #(
   parameter ADDRESS_WIDTH   = 16,
-  parameter DATA_WIDTH      = 8,
-  parameter DATA_BYTES      = 1,
+  parameter DATA_WIDTH      = 16,
+  parameter DATA_BYTES      = 2,
   parameter BASE_ADDRESS    = 0,
   parameter MAX_WAIT        = 8,
   parameter FRAME_ADDRESS   = 0
@@ -30,7 +30,7 @@ module test_pattern #(
   assign rst = rst_i;
   
   localparam MAX_PAYLOAD = 2;
-  localparam INTERFACE_WIDTH = 2 * DATA_WIDTH;
+  localparam INTERFACE_WIDTH = DATA_WIDTH;
   
   wire [INTERFACE_WIDTH-1:0] payload_out = 0;
   reg [ADDRESS_WIDTH-1:0]    address = 0;
@@ -49,7 +49,7 @@ module test_pattern #(
     .DATA_WIDTH    (DATA_WIDTH),
     .DATA_BYTES    (DATA_BYTES),
     .MAX_WAIT      (MAX_WAIT),
-    .MAX_PAYLOAD   (2)
+    .MAX_PAYLOAD   (1)
   ) wb_master (
     // Wishbone interface
     .rst_i           ( rst_i ),
@@ -69,7 +69,7 @@ module test_pattern #(
     .transfer_address( next_address   ),
     .payload_in      ( payload_in     ),
     .payload_out     (                ),
-    .payload_length  ( 2              ),
+    .payload_length  ( 1              ),
     .start_read      ( 0              ),
     .read_busy       (                ),
     .start_write     ( start_write    ),
@@ -166,11 +166,11 @@ module test_pattern #(
 
       if (mirror) begin
         next_address = (FRAME_ADDRESS + 
-                          {5'd0, row[3:0], inv_col[4:0], 1'b0}) + (page ? 16'h0400 : 16'h0000);
+                          {5'd0, row[3:0], inv_col[4:0]}) + (page ? 16'h0400 : 16'h0000);
       end
       else begin
         next_address = (FRAME_ADDRESS + 
-                          {5'd0, row[3:0], col[4:0], 1'b0}) + (page ? 16'h0400 : 16'h0000);
+                          {5'd0, row[3:0], col[4:0]}) + (page ? 16'h0400 : 16'h0000);
       end
       
       next_save_state = SAVE_STATE_LATCH_DELAY;
@@ -222,8 +222,8 @@ module test_pattern #(
     end
 
     SAVE_STATE_UPDATE_FB_REQUEST: begin
-      next_address    = `MATRIX_START + `MATRIX_ADDR_L;
-      next_payload_in = FRAME_ADDRESS + (page ? 16'h0400 : 16'h0000);
+      next_address    = `MATRIX_START;
+      next_payload_in = { (FRAME_ADDRESS + (page ? 16'h0400 : 16'h0000)), 1'b0 };
       next_page   = ~page;
       
       next_save_state = SAVE_STATE_UPDATE_FB_COMPLETE;

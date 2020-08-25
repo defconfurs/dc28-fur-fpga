@@ -170,21 +170,21 @@ module top (
   
   //---------------------------------------------------------------
   // Wishbone arbitration connections
-  reg [7:0] data_in;
-  wire      ack;
+  reg [15:0] data_in;
+  wire       ack;
   
-  reg [7:0] led_data;
-  reg       led_ack;
+  reg [15:0] led_data;
+  reg        led_ack;
   
-  wire [7:0] mem2_data;
-  wire       mem2_ack;
+  wire [15:0] mem2_data;
+  wire        mem2_ack;
 
   assign ack = |{led_ack};
   
   always @(*) begin
     if      (led_ack)    begin  data_in = led_data;    end
     else if (mem2_ack)   begin  data_in = mem2_data;   end
-    else                 begin  data_in = 8'd0;        end
+    else                 begin  data_in = 16'd0;       end
   end
 
     
@@ -192,18 +192,18 @@ module top (
   // currently using the bus, block everything else
   wire        cycle;
   reg [15:0]  adr;
-  reg [7:0]   data;
+  reg [15:0]  data;
   reg         we;
-  reg [0:0]   sel;
+  reg [1:0]   sel;
   reg         stb;
   reg [2:0]   cti;
     
   wire        tpat_cycle;
   wire        tpat_cycle_in;
   wire [15:0] tpat_adr;
-  wire [7:0]  tpat_data;
+  wire [15:0] tpat_data;
   wire        tpat_we;
-  wire        tpat_sel;
+  wire [1:0]  tpat_sel;
   wire        tpat_stb;
   wire [2:0]  tpat_cti;
   
@@ -215,7 +215,7 @@ module top (
   always @(*) begin
     //if      (rs232_cycle)    begin  adr = rs232_adr;     data = rs232_data;     we = rs232_we;     sel = rs232_sel;     stb = rs232_stb;     cti = rs232_cti;    end
     if (tpat_cycle)     begin  adr =    tpat_adr;   data =    tpat_data;   we =    tpat_we;   sel =    tpat_sel;   stb =    tpat_stb;   cti =    tpat_cti;  end
-    else                begin  adr =       16'd0;   data =         8'd0;   we =          0;   sel =           0;   stb =           0;   cti =        3'd0;  end
+    else                begin  adr =       16'd0;   data =        16'd0;   we =          0;   sel =           0;   stb =           0;   cti =        3'd0;  end
   end
 
   
@@ -226,10 +226,9 @@ module top (
   
   led_matrix #(
     .ADDRESS_WIDTH   ( 16 ),
-    .DATA_WIDTH      ( 8 ),
-    .DATA_BYTES      ( 1 ),
-    .BASE_ADDRESS    ( `MATRIX_START ),
-    .BASE_MEM_ADDRESS( `FRAME_MEMORY_START )
+    .DATA_WIDTH      ( 16 ),
+    .DATA_BYTES      ( 2 ),
+    .BASE_ADDRESS    ( `MATRIX_START )
   ) led_matrix_inst (
     // Wishbone interface
     .rst_i ( rst ),
@@ -311,7 +310,7 @@ module top (
     else begin
       if (0) begin // flag to switch between the LED test pattern (0) and VU meter (1)
         test_intensity #(
-          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1024)
+          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1)
         )test_pattern_inst (
           .rst_i ( rst ),
           .clk_i ( clk ),
@@ -332,7 +331,7 @@ module top (
       end
       else begin
         test_pattern #(
-          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1024 )//`FRAME_MEMORY_START )
+          .FRAME_ADDRESS ( `FRAME_MEMORY_START + 1 )//`FRAME_MEMORY_START )
         )test_pattern_inst (
           .rst_i ( rst ),
           .clk_i ( clk ),
