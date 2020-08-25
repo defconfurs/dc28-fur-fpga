@@ -66,9 +66,9 @@ module top (
 
   SB_RGBA_DRV #(
     .CURRENT_MODE ( "0b1"        ), // half current mode
-    .RGB0_CURRENT ( "0b00000000" ), // 4mA
-    .RGB1_CURRENT ( "0b00000000" ),
-    .RGB2_CURRENT ( "0b00000000" )
+    .RGB0_CURRENT ( "0b00000001" ), // 4mA
+    .RGB1_CURRENT ( "0b00000001" ),
+    .RGB2_CURRENT ( "0b00000001" )
   ) rgb_drv_inst (
     .RGBLEDEN ( stat_en    ),
     .CURREN   ( stat_en    ),
@@ -252,7 +252,7 @@ module top (
   // Create the Wishbone crossbar.
   wbcxbar#(
     .NM(2), // One port each for instruction and data access from the CPU.
-    .NS(4), // One port for SRAM, boot ROM and PWM LED driver.
+    .NS(5), // One port for SRAM, boot ROM and PWM LED driver.
     .AW(WB_ADDR_WIDTH),
     .DW(WB_DATA_WIDTH),
     .MUXWIDTH(4),
