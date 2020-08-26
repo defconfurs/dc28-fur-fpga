@@ -60,24 +60,65 @@ int main(void)
     int toggle = 0;
     char ch = 'A';
     int i;
+    int x, y;
     int count = 0;
+    int success = 0;
 
-    for (i = 0; i < LED_PWM_COUNT; i++) {
-        ledpwm[i] = val;
-        val >>= 2;
+    ledpwm[0] = 127;
+    ledpwm[1] = 0;
+    ledpwm[3] = 0;
+    
+    //for (i = 0; i < LED_PWM_COUNT; i++) {
+    //    ledpwm[i] = val;
+    //    val >>= 2;
+    //}
+
+    for (y = 0; y < 14; y++) {
+        for (x = 0; x < 32; x++) {
+            *(uint16_t*)(0x40000004 + (x<<1) + (y<<6)) = x<<11 | y<<1;
+        }
     }
+    *(uint16_t*)(0x40000000) = 4;
 
+    ledpwm[0] = 0;
+    ledpwm[1] = 1;
+    ledpwm[3] = 0;
+    
     /* And finally - the main loop. */
     while (1) {
         /* If there are characters received, echo them back. */
         if (SERIAL->isr & 0x01) {
             uint8_t ch = SERIAL->rhr;
-            ledpwm[0] = (toggle) ? 0xff : 0;
+            ledpwm[1] = (toggle) ? 0xff : 0;
             toggle = (toggle == 0);
             count++;
+
+            if (ch == 0x20) {
+                *(uint8_t*)(0x50000008) = 0x5A;
+                *(uint8_t*)(0x50000009) = 0x01;
+                *(uint8_t*)(0x5000000A) = 0x02;
+                *(uint8_t*)(0x5000000B) = 0x03;
+                printf(" u8: %08X\n\r", *(volatile uint32_t*)(0x50000008));
+
+                *(uint16_t*)(0x5000000C) = 0x345A;
+                *(uint16_t*)(0x5000000E) = 0x0102;
+                printf("u16: %08X\n\r", *(volatile uint32_t*)(0x5000000C));
+
+                *(uint32_t*)(0x50000010) = 0x0607345A;
+                printf("u32: %08X\n\r", *(volatile uint32_t*)(0x50000010));
+            }
+            
 #if 1
             if ((count % 64) == 0) {
                 printf("Hello World %d\n", count);
+                //for (i=0; i < 64; i++) {
+                //    *(uint16_t*)(0x50000100+(i<<1)) = i;
+                //}
+                //for (i=0; i < 32; i++) {
+                //    printf("%08X\n\r", *(volatile uint32_t*)(0x50000100+i<<2));
+                //}
+                //if (success) printf("Mem check passed\n\r");
+                //else         printf("Mem check failed\n\r");
             }
 #else
             serial_putc(ch);

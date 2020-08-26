@@ -22,7 +22,7 @@ LDFLAGS = CFLAGS + ['-Wl,-Bstatic,-T,'+ldsfile+',--gc-sections']
 pcf_file = "Prototype2_hardware.pcf"
 
 # Common USB sources, shared by both the DFU bootloader and user bitstream.
-rtl_usb_dir = 'tinydfu-bootloader/usb'
+rtl_usb_dir = os.path.join(srcdir, 'tinydfu-bootloader/usb')
 rtl_usb_srcs = ["edge_detect.v",
                 "strobe.v",
                 "usb_fs_in_arb.v",
@@ -89,21 +89,23 @@ if os.name=='nt':
     iceprog       = os.path.join(pio, 'toolchain-ice40\\bin\\iceprog.exe')
     gcc           = os.path.join(platformio, 'toolchain-riscv\\bin\\riscv64-unknown-elf-gcc.exe')
     objcopy       = os.path.join(platformio, 'toolchain-riscv\\bin\\riscv64-unknown-elf-objcopy.exe')
-
+    verilator     = os.path.join(pio, 'toolchain-verilator\\bin\\verilator.exe')
+    
 else:
-    pio_rel = '.platformio/packages/toolchain-icestorm/bin'
+    pio_rel = '.platformio/packages/'
     pio = os.path.join(os.environ['HOME'], pio_rel)
     
     # Use PlatformIO, if it exists.
     if os.path.exists(pio):
-        icepack       = os.path.join(pio, 'icepack')
-        icemulti      = os.path.join(pio, 'icemulti')
-        arachne_pnr   = os.path.join(pio, 'arachne-pnr')
-        nextpnr_ice40 = os.path.join(pio, 'nextpnr-ice40')
-        yosys         = os.path.join(pio, 'yosys')
-        iceprog       = os.path.join(pio, 'iceprog')
-        gcc           = os.path.join(pio, 'riscv64-unknown-elf-gcc')
-        objcopy       = os.path.join(pio, 'riscv64-unknown-elf-objcopy')
+        icepack       = os.path.join(pio, 'toolchain-icestorm/bin/icepack')
+        icemulti      = os.path.join(pio, 'toolchain-icestorm/bin/icemulti')
+        arachne_pnr   = os.path.join(pio, 'toolchain-icestorm/bin/arachne-pnr')
+        nextpnr_ice40 = os.path.join(pio, 'toolchain-icestorm/bin/nextpnr-ice40')
+        yosys         = os.path.join(pio, 'toolchain-yosys/bin/yosys')
+        iceprog       = os.path.join(pio, 'toolchain-icestorm/bin/iceprog')
+        gcc           = os.path.join(pio, 'toolchain-riscv/bin/riscv64-unknown-elf-gcc')
+        objcopy       = os.path.join(pio, 'toolchain-riscv/bin/riscv64-unknown-elf-objcopy')
+        verilator     = os.path.join(pio, 'toolchain-verilator/bin/verilator.exe')
     # Otherwise, assume the tools are in the PATH.
     else:
         icepack       = 'icepack'
@@ -114,6 +116,7 @@ else:
         iceprog       = 'iceprog'
         gcc           = 'riscv64-unknown-elf-gcc'
         objcopy       = 'riscv64-unknown-elf-objcopy'
+        verilaotor    = 'verilator'
 
 def hexdump(infile, outfile):
     with open(outfile, 'w') as hexfile:
@@ -235,6 +238,24 @@ def build_rom(*args, name='firmware'):
 
     
 #######################################
+## Simulate target
+#######################################
+def simulate(*args, name='top', tempdir='./sim'):
+    #$(SIMTOP): $(SIMTOP).v $(SOURCES) $(SIMTOP).cpp firmware.mem
+    #   verilator --trace --top-module $(SIMTOP) -cc $(filter %.v,$^) -Wno-fatal --exe $(SIMTOP).cpp
+    #   make -C obj_dir -f V$(SIMTOP).mk
+    try:
+        os.makedirs(tempdir)
+    except FileExistsError as e:
+        pass
+
+    if call([verilator, '--trace', '--top-module', name, '-cc'] + [*args] + ['Wno-fatal', '--exe', os.path.join(tempdir, name+'.cpp')]) != 0:
+        return
+
+    
+        
+    
+#######################################
 ## Cleanup After Ourselves
 #######################################
 def clean():
@@ -318,6 +339,9 @@ def main():
             if call([iceprog, '-R', "1M", 'readout.bin']) != 0:
                 return
 
+        elif command == 'simulate':
+            simulate(*sources, name='top', tempdir='./sim')
+            
         elif command == 'clean':
             clean()
             

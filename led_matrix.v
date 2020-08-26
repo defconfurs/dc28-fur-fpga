@@ -1,9 +1,9 @@
 `include "globals.vh"
 
 module led_matrix #(
-    parameter ADDRESS_WIDTH    = 16,
-    parameter DATA_WIDTH       = 16,
-    parameter DATA_BYTES       = 2,
+    parameter ADDRESS_WIDTH    = 30,
+    parameter DATA_WIDTH       = 32,
+    localparam DATA_BYTES      = DATA_WIDTH/8,
     parameter BASE_ADDRESS     = 0
 )  (
   // Wishbone interface
@@ -66,7 +66,7 @@ module led_matrix #(
   wire [MEM_ADDR_WIDTH-1:0] ram_address;
   wire [15:0]               ram_data_in;
   reg [15:0]                ram_data_out;
-  reg                       ram_we;
+  wire                      ram_we;
 
   
   wire [MEM_ADDR_WIDTH-1:0] wb_mem_address;
@@ -84,19 +84,19 @@ module led_matrix #(
   //===========================================================================================
   // Wishbone slave
   wire       address_in_range;
-  assign address_in_range = adr_i == BASE_ADDRESS;
+  assign address_in_range = adr_i == BASE_ADDRESS && |sel_i[1:0];
 
-  wire       address_in_mem_range;
   wire [13:0] local_address;
-  assign wb_mem_address = adr_i[MEM_ADDR_WIDTH-1:0];
-  assign address_in_mem_range = ((adr_i & ~((1<<MEM_ADDR_WIDTH)-1)) == BASE_ADDRESS) && !address_in_range;
+  wire        upper_hword;
+  assign upper_hword = !(|sel_i[1:0]);
+  assign wb_mem_address = { adr_i[MEM_ADDR_WIDTH-1:0], upper_hword };
   
-  wire       masked_cyc = ((address_in_range | address_in_mem_range) & cyc_i);
-  assign wb_mem_we = (stb_i & address_in_mem_range & we_i);
-  assign wb_mem_data_in = dat_i;
+  wire       masked_cyc = (cyc_i);
+  assign wb_mem_we = (stb_i & |we_i);
+  assign wb_mem_data_in = upper_hword ? dat_i[31:16] : dat_i[15:0];
 
   always @(posedge clk_i) begin
-    if (address_in_mem_range && mem_busy) ack_o = 0;
+    if (!address_in_range && mem_busy) ack_o = 0;
     else ack_o <= masked_cyc;
   end
 
@@ -114,13 +114,9 @@ module led_matrix #(
 
   // note - this is hard-coded for only one register at address 0
   always @(*) begin
-    if (~masked_cyc) begin dat_o = 0; end
-    else if (address_in_mem_range) begin
-      dat_o         = wb_mem_data_out;
-    end
-    else begin
-      dat_o         = { frame_address, 1'b0 };
-    end
+    if (~masked_cyc)           dat_o = 0;
+    else if (address_in_range) dat_o = { frame_address, 1'b0 };
+    else                       dat_o = upper_hword ? { wb_mem_data_out, 16'd0 } : { 16'd0, wb_mem_data_out };
   end
 
   //===========================================================================================
@@ -141,7 +137,7 @@ module led_matrix #(
       wb_mem_data_out = 0;
     end
     else begin
-      raminst_wen     = sel_i & { DATA_BYTES { wb_mem_we }};
+      raminst_wen     = (sel_i[3:2] | sel_i[1:0]) & { DATA_BYTES { wb_mem_we }};
       raminst_data_in = wb_mem_data_in;
       raminst_address = wb_mem_address;
       wb_mem_data_out = raminst_data_out;
@@ -188,6 +184,10 @@ module led_matrix #(
   reg [N_ROWS_SIZE:0]          pixel_being_updated = 0;
   reg [N_COLS_SIZE-1:0]        current_col = 0;
   
+
+  reg [TOTAL_LINE_TIME_SIZE-1:0]   col_timer = 0;
+  reg [TOTAL_LOAD_TIME_SIZE-1:0]   load_timer = 0;
+
   //===========================================================================================
   // Nonlinear timer
   reg [7:0] brightness_lut_out;
@@ -222,8 +222,6 @@ module led_matrix #(
   //===========================================================================================
   // The matrix display
   
-  reg [TOTAL_LINE_TIME_SIZE-1:0]   col_timer = 0;
-  reg [TOTAL_LOAD_TIME_SIZE-1:0]   load_timer = 0;
 
   localparam LOAD_STATE_START_REQUEST     = 5'b00001;
   localparam LOAD_STATE_REQUEST_DELAY     = 5'b00010;
@@ -454,8 +452,8 @@ module led_matrix #(
 
   assign row_oe      = 0;
   assign col_first   = (current_col == 0) && (current_field == FIELD_BLUE);
-  assign col_advance = shift_clock_counter < (SHIFT_CLOCK_PERIOD >> 1) && shift_clock_counter > 0;
-  assign col_rclk    = shift_clock_counter > (SHIFT_CLOCK_PERIOD >> 1) && shift_clock_counter > 0;
+  assign col_advance = shift_clock_counter < (SHIFT_CLOCK_PERIOD >> 4) && shift_clock_counter > 0;
+  assign col_rclk    = shift_clock_counter > (SHIFT_CLOCK_PERIOD >> 4) && shift_clock_counter > 0;
   
   
 endmodule

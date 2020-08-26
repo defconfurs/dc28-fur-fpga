@@ -150,8 +150,8 @@ module top (
       reset_cnt <= 0;
     end
   end
-  
-  reg  clk_24mhz = 0;
+
+  reg  clk_24mhz     = 0;
   always @(posedge clk_48mhz) clk_24mhz <= ~clk_24mhz;
   
   reg  clk_12mhz = 0;
@@ -162,13 +162,13 @@ module top (
   
   wire clk;
   wire rst;
-  localparam CLK_FREQ = 24000000;
+  localparam CLK_FREQ = 12000000;
   assign clk = clk_12mhz;
   assign rst = reset;
 
-  assign pin_iob_9b = clk_48mhz;
-  assign pin_iob_8a = clk;
-  assign pin_iob_13b = rst;
+  assign pin_iob_9b = 0;//clk_48mhz;
+  assign pin_iob_8a = 0;//clk;
+  assign pin_iob_13b = 0;//rst;
 
   
   //---------------------------------------------------------------
@@ -212,6 +212,16 @@ module top (
   wire                     wb_sram_cyc;
   wire                     wb_sram_stb;
 
+  // Instantiate the SPRAM.
+  wire [WB_ADDR_WIDTH-1:0] wb_spram_addr;
+  wire [WB_DATA_WIDTH-1:0] wb_spram_rdata;
+  wire [WB_DATA_WIDTH-1:0] wb_spram_wdata;
+  wire                     wb_spram_we;
+  wire [WB_SEL_WIDTH-1:0]  wb_spram_sel;
+  wire                     wb_spram_ack;
+  wire                     wb_spram_cyc;
+  wire                     wb_spram_stb;
+
   // Access to the display
   wire [WB_ADDR_WIDTH-1:0] wb_display_addr;
   wire [WB_DATA_WIDTH-1:0] wb_display_rdata;
@@ -252,7 +262,7 @@ module top (
   // Create the Wishbone crossbar.
   wbcxbar#(
     .NM(2), // One port each for instruction and data access from the CPU.
-    .NS(5), // One port for SRAM, boot ROM and PWM LED driver.
+    .NS(6), // One port for SRAM, boot ROM and PWM LED driver.
     .AW(WB_ADDR_WIDTH),
     .DW(WB_DATA_WIDTH),
     .MUXWIDTH(4),
@@ -261,7 +271,8 @@ module top (
         { 4'h1 },  // Base address of the SRAM.
         { 4'h2 },  // Base address of the PWM driver.
         { 4'h3 },  // Base address of the USB Serial interface.
-        { 4'h4 }   // Base address of the LED Driver interface.
+        { 4'h4 },  // Base address of the LED Driver interface.
+        { 4'h5 }   // Base address of the SPRAM or bulk 32 bit ram
     })
   ) vexcrossbar (
     .i_clk  ( clk ),
@@ -279,15 +290,15 @@ module top (
     .o_mdata ({ wbc_ibus_rdata, wbc_dbus_rdata }),
 
     // Crossbar Slave Ports.
-    .o_scyc  ({ wb_bootrom_cyc,   wb_sram_cyc,   wb_ledpwm_cyc,   wb_serial_cyc,   wb_display_cyc   }),
-    .o_sstb  ({ wb_bootrom_stb,   wb_sram_stb,   wb_ledpwm_stb,   wb_serial_stb,   wb_display_stb   }),
-    .o_swe   ({ wb_bootrom_we,    wb_sram_we,    wb_ledpwm_we,    wb_serial_we,    wb_display_we    }),
-    .o_saddr ({ wb_bootrom_addr,  wb_sram_addr,  wb_ledpwm_addr,  wb_serial_addr,  wb_display_addr  }),
-    .o_sdata ({ wb_bootrom_wdata, wb_sram_wdata, wb_ledpwm_wdata, wb_serial_wdata, wb_display_wdata }),
-    .o_ssel  ({ wb_bootrom_sel,   wb_sram_sel,   wb_ledpwm_sel,   wb_serial_sel,   wb_display_sel   }),
-    .i_sack  ({ wb_bootrom_ack,   wb_sram_ack,   wb_ledpwm_ack,   wb_serial_ack,   wb_display_ack   }),
-    .i_serr  ({ 1'b0,             1'b0,          1'b0,            1'b0,            1'b0             }),
-    .i_sdata ({ wb_bootrom_rdata, wb_sram_rdata, wb_ledpwm_rdata, wb_serial_rdata, wb_display_rdata })
+    .o_scyc  ({ wb_bootrom_cyc,   wb_sram_cyc,   wb_ledpwm_cyc,   wb_serial_cyc,   wb_display_cyc,   wb_spram_cyc   }),
+    .o_sstb  ({ wb_bootrom_stb,   wb_sram_stb,   wb_ledpwm_stb,   wb_serial_stb,   wb_display_stb,   wb_spram_stb   }),
+    .o_swe   ({ wb_bootrom_we,    wb_sram_we,    wb_ledpwm_we,    wb_serial_we,    wb_display_we,    wb_spram_we    }),
+    .o_saddr ({ wb_bootrom_addr,  wb_sram_addr,  wb_ledpwm_addr,  wb_serial_addr,  wb_display_addr,  wb_spram_addr  }),
+    .o_sdata ({ wb_bootrom_wdata, wb_sram_wdata, wb_ledpwm_wdata, wb_serial_wdata, wb_display_wdata, wb_spram_wdata }),
+    .o_ssel  ({ wb_bootrom_sel,   wb_sram_sel,   wb_ledpwm_sel,   wb_serial_sel,   wb_display_sel,   wb_spram_sel   }),
+    .i_sack  ({ wb_bootrom_ack,   wb_sram_ack,   wb_ledpwm_ack,   wb_serial_ack,   wb_display_ack,   wb_spram_ack   }),
+    .i_serr  ({ 1'b0,             1'b0,          1'b0,            1'b0,            1'b0,             1'b0           }),
+    .i_sdata ({ wb_bootrom_rdata, wb_sram_rdata, wb_ledpwm_rdata, wb_serial_rdata, wb_display_rdata, wb_spram_rdata })
   );
   
 
@@ -333,32 +344,31 @@ module top (
   
   //---------------------------------------------------------------
   led_matrix #(
-    .ADDRESS_WIDTH   ( 16 ),
-    .DATA_WIDTH      ( 16 ),
-    .DATA_BYTES      ( 2 ),
-    .BASE_ADDRESS    ( `MATRIX_START )
+    .ADDRESS_WIDTH   ( WB_ADDR_WIDTH ),
+    .DATA_WIDTH      ( WB_DATA_WIDTH ),
+    .BASE_ADDRESS    ( 0 )
   ) led_matrix_inst (
     // Wishbone interface
     .rst_i ( rst ),
     .clk_i ( clk ),
   
-    .adr_i ( wb_display_addr[15:0] ),
-    .dat_i ( wb_display_wdata[15:0] ),
-    .dat_o ( {16'd0, wb_display_rdata} ),
-    .we_i  ( wb_display_we ),
-    .sel_i ( wb_display_sel[1:0] ),
-    .stb_i ( wb_display_stb ),
-    .cyc_i ( wb_display_cyc ),
-    .ack_o ( wb_display_ack ),
-    .cti_i ( 0 ),
+    .adr_i ( wb_display_addr  ),
+    .dat_i ( wb_display_wdata ),
+    .dat_o ( wb_display_rdata ),
+    .we_i  ( wb_display_we    ),
+    .sel_i ( wb_display_sel   ),
+    .stb_i ( wb_display_stb   ),
+    .cyc_i ( wb_display_cyc   ),
+    .ack_o ( wb_display_ack   ),
+    .cti_i ( 0                ),
   
     // LED Drive Out
     .latch_row_bank ( latch_row_bank ),
-    .row_data       ( row_data ),
-    .row_oe         ( row_oe ),
-    .col_first      ( col_first ),
-    .col_advance    ( col_advance ),
-    .col_rclk       ( col_rclk ),
+    .row_data       ( row_data       ),
+    .row_oe         ( row_oe         ),
+    .col_first      ( col_first      ),
+    .col_advance    ( col_advance    ),
+    .col_rclk       ( col_rclk       ),
 
     .frame_complete ( frame_complete ),
                    
@@ -473,26 +483,42 @@ module top (
     .AW(WB_ADDR_WIDTH),
     .DW(WB_DATA_WIDTH)
   ) vexsram(
-    .wb_clk_i(clk),
-    .wb_reset_i(rst),
-    .wb_adr_i(wb_sram_addr),
-    .wb_dat_i(wb_sram_wdata),
-    .wb_dat_o(wb_sram_rdata),
-    .wb_we_i(wb_sram_we),
-    .wb_sel_i(wb_sram_sel),
-    .wb_ack_o(wb_sram_ack),
-    .wb_cyc_i(wb_sram_cyc),
-    .wb_stb_i(wb_sram_stb)
+    .wb_clk_i  ( clk ),
+    .wb_reset_i( rst ),
+    .wb_adr_i  ( wb_sram_addr  ),
+    .wb_dat_i  ( wb_sram_wdata ),
+    .wb_dat_o  ( wb_sram_rdata ),
+    .wb_we_i   ( wb_sram_we    ),
+    .wb_sel_i  ( wb_sram_sel   ),
+    .wb_ack_o  ( wb_sram_ack   ),
+    .wb_cyc_i  ( wb_sram_cyc   ),
+    .wb_stb_i  ( wb_sram_stb   )
   );
-  
+
+  //---------------------------------------------------------------
+  // SPRAM
+  wbspram #(
+    .AW ( WB_ADDR_WIDTH ),
+    .DW ( WB_DATA_WIDTH )
+  ) spram_inst (
+    // Wishbone interface.
+    .wb_clk_i   ( clk ),
+    .wb_reset_i ( rst ),
+    .wb_adr_i   ( wb_spram_addr  ),
+    .wb_dat_i   ( wb_spram_wdata ),
+    .wb_dat_o   ( wb_spram_rdata ),
+    .wb_we_i    ( wb_spram_we    ),
+    .wb_sel_i   ( wb_spram_sel   ),
+    .wb_ack_o   ( wb_spram_ack   ),
+    .wb_cyc_i   ( wb_spram_cyc   ),
+    .wb_stb_i   ( wb_spram_stb   )
+  );
   
   //---------------------------------------------------------------
   // Audio
 
 
   reg [3:0] audio_volume;
-  reg [3:0] audio_peak;
-  assign audio_peak = 0;
 
 
   wire signed [11:0] audio1;
