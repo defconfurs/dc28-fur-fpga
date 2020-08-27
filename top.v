@@ -170,68 +170,94 @@ module top (
   assign pin_iob_8a = 0;//clk;
   assign pin_iob_13b = 0;//rst;
 
+  localparam XBAR_ADDR_WIDTH = 4;
+  localparam SELECTOR_ADDR_WIDTH = 4;
+
+  localparam WB_XADDR_WIDTH = WB_ADDR_WIDTH - XBAR_ADDR_WIDTH;
+  localparam WB_SADDR_WIDTH = WB_XADDR_WIDTH - SELECTOR_ADDR_WIDTH - 8;
   
   //---------------------------------------------------------------
   // CPU wishbone components
-  wire [WB_ADDR_WIDTH-1:0] wb_serial_addr;
-  wire [WB_DATA_WIDTH-1:0] wb_serial_rdata;
-  wire [WB_DATA_WIDTH-1:0] wb_serial_wdata;
-  wire                     wb_serial_we;
-  wire [WB_SEL_WIDTH-1:0]  wb_serial_sel;
-  wire                     wb_serial_ack;
-  wire                     wb_serial_cyc;
-  wire                     wb_serial_stb;
+  wire [WB_SADDR_WIDTH-1:0] wb_serial_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_serial_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_serial_wdata;
+  wire                      wb_serial_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_serial_sel;
+  wire                      wb_serial_ack;
+  wire                      wb_serial_cyc;
+  wire                      wb_serial_stb;
   
   // Wishbone connected LED driver.
-  wire [WB_ADDR_WIDTH-1:0] wb_ledpwm_addr;
-  wire [WB_DATA_WIDTH-1:0] wb_ledpwm_rdata;
-  wire [WB_DATA_WIDTH-1:0] wb_ledpwm_wdata;
-  wire                     wb_ledpwm_we;
-  wire [WB_SEL_WIDTH-1:0]  wb_ledpwm_sel;
-  wire                     wb_ledpwm_ack;
-  wire                     wb_ledpwm_cyc;
-  wire                     wb_ledpwm_stb;
+  wire [WB_SADDR_WIDTH-1:0] wb_ledpwm_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_ledpwm_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_ledpwm_wdata;
+  wire                      wb_ledpwm_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_ledpwm_sel;
+  wire                      wb_ledpwm_ack;
+  wire                      wb_ledpwm_cyc;
+  wire                      wb_ledpwm_stb;
 
   // Instantiate the boot ROM.
-  wire [WB_ADDR_WIDTH-1:0] wb_bootrom_addr;
-  wire [WB_DATA_WIDTH-1:0] wb_bootrom_rdata;
-  wire [WB_DATA_WIDTH-1:0] wb_bootrom_wdata;
-  wire                     wb_bootrom_we;
-  wire [WB_SEL_WIDTH-1:0]  wb_bootrom_sel;
-  wire                     wb_bootrom_ack;
-  wire                     wb_bootrom_cyc;
-  wire                     wb_bootrom_stb;
+  wire [WB_XADDR_WIDTH-1:0] wb_bootrom_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_bootrom_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_bootrom_wdata;
+  wire                      wb_bootrom_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_bootrom_sel;
+  wire                      wb_bootrom_ack;
+  wire                      wb_bootrom_cyc;
+  wire                      wb_bootrom_stb;
 
   // Instantiate the SRAM.
-  wire [WB_ADDR_WIDTH-1:0] wb_sram_addr;
-  wire [WB_DATA_WIDTH-1:0] wb_sram_rdata;
-  wire [WB_DATA_WIDTH-1:0] wb_sram_wdata;
-  wire                     wb_sram_we;
-  wire [WB_SEL_WIDTH-1:0]  wb_sram_sel;
-  wire                     wb_sram_ack;
-  wire                     wb_sram_cyc;
-  wire                     wb_sram_stb;
+  wire [WB_XADDR_WIDTH-1:0] wb_sram_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_sram_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_sram_wdata;
+  wire                      wb_sram_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_sram_sel;
+  wire                      wb_sram_ack;
+  wire                      wb_sram_cyc;
+  wire                      wb_sram_stb;
 
   // Instantiate the SPRAM.
-  wire [WB_ADDR_WIDTH-1:0] wb_spram_addr;
-  wire [WB_DATA_WIDTH-1:0] wb_spram_rdata;
-  wire [WB_DATA_WIDTH-1:0] wb_spram_wdata;
-  wire                     wb_spram_we;
-  wire [WB_SEL_WIDTH-1:0]  wb_spram_sel;
-  wire                     wb_spram_ack;
-  wire                     wb_spram_cyc;
-  wire                     wb_spram_stb;
+  wire [WB_XADDR_WIDTH-1:0] wb_spram_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_spram_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_spram_wdata;
+  wire                      wb_spram_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_spram_sel;
+  wire                      wb_spram_ack;
+  wire                      wb_spram_cyc;
+  wire                      wb_spram_stb;
 
   // Access to the display
-  wire [WB_ADDR_WIDTH-1:0] wb_display_addr;
-  wire [WB_DATA_WIDTH-1:0] wb_display_rdata;
-  wire [WB_DATA_WIDTH-1:0] wb_display_wdata;
-  wire                     wb_display_we;
-  wire [WB_SEL_WIDTH-1:0]  wb_display_sel;
-  wire                     wb_display_ack;
-  wire                     wb_display_cyc;
-  wire                     wb_display_stb;
+  wire [WB_SADDR_WIDTH-1:0] wb_display_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_display_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_display_wdata;
+  wire                      wb_display_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_display_sel;
+  wire                      wb_display_ack;
+  wire                      wb_display_cyc;
+  wire                      wb_display_stb;
 
+  // SPI Interface
+  wire [WB_SADDR_WIDTH-1:0] wb_spi_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_spi_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_spi_wdata;
+  wire                      wb_spi_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_spi_sel;
+  wire                      wb_spi_ack;
+  wire                      wb_spi_cyc;
+  wire                      wb_spi_stb;
+
+  // Peripherals to simplify the mux component
+  wire [WB_XADDR_WIDTH-1:0] wb_peripherals_addr;
+  wire [WB_DATA_WIDTH-1:0]  wb_peripherals_rdata;
+  wire [WB_DATA_WIDTH-1:0]  wb_peripherals_wdata;
+  wire                      wb_peripherals_we;
+  wire [WB_SEL_WIDTH-1:0]   wb_peripherals_sel;
+  wire                      wb_peripherals_ack;
+  wire                      wb_peripherals_cyc;
+  wire                      wb_peripherals_stb;
+  wire                      wb_peripherals_err;
+  
   // Instruction Bus wishbone signals (classic)
   wire [WB_ADDR_WIDTH-1:0] wbc_ibus_addr;
   wire [WB_DATA_WIDTH-1:0] wbc_ibus_rdata;
@@ -262,17 +288,15 @@ module top (
   // Create the Wishbone crossbar.
   wbcxbar#(
     .NM(2), // One port each for instruction and data access from the CPU.
-    .NS(6), // One port for SRAM, boot ROM and PWM LED driver.
+    .NS(4), // One port for SRAM, boot ROM and PWM LED driver.
     .AW(WB_ADDR_WIDTH),
     .DW(WB_DATA_WIDTH),
     .MUXWIDTH(4),
     .SLAVE_MUX({
-        { 4'h0 },  // Base address of the boot ROM.
-        { 4'h1 },  // Base address of the SRAM.
-        { 4'h2 },  // Base address of the PWM driver.
-        { 4'h3 },  // Base address of the USB Serial interface.
-        { 4'h4 },  // Base address of the LED Driver interface.
-        { 4'h5 }   // Base address of the SPRAM or bulk 32 bit ram
+        { 4'h0 },  // Base address of the boot ROM.                 0x00000000
+        { 4'h1 },  // Base address of the SRAM.                     0x10000000
+        { 4'h2 },  // Base address of the SPRAM or bulk 32 bit ram  0x20000000
+        { 4'h4 }   // Base address of the Peripherals               0x40000000
     })
   ) vexcrossbar (
     .i_clk  ( clk ),
@@ -290,15 +314,53 @@ module top (
     .o_mdata ({ wbc_ibus_rdata, wbc_dbus_rdata }),
 
     // Crossbar Slave Ports.
-    .o_scyc  ({ wb_bootrom_cyc,   wb_sram_cyc,   wb_ledpwm_cyc,   wb_serial_cyc,   wb_display_cyc,   wb_spram_cyc   }),
-    .o_sstb  ({ wb_bootrom_stb,   wb_sram_stb,   wb_ledpwm_stb,   wb_serial_stb,   wb_display_stb,   wb_spram_stb   }),
-    .o_swe   ({ wb_bootrom_we,    wb_sram_we,    wb_ledpwm_we,    wb_serial_we,    wb_display_we,    wb_spram_we    }),
-    .o_saddr ({ wb_bootrom_addr,  wb_sram_addr,  wb_ledpwm_addr,  wb_serial_addr,  wb_display_addr,  wb_spram_addr  }),
-    .o_sdata ({ wb_bootrom_wdata, wb_sram_wdata, wb_ledpwm_wdata, wb_serial_wdata, wb_display_wdata, wb_spram_wdata }),
-    .o_ssel  ({ wb_bootrom_sel,   wb_sram_sel,   wb_ledpwm_sel,   wb_serial_sel,   wb_display_sel,   wb_spram_sel   }),
-    .i_sack  ({ wb_bootrom_ack,   wb_sram_ack,   wb_ledpwm_ack,   wb_serial_ack,   wb_display_ack,   wb_spram_ack   }),
-    .i_serr  ({ 1'b0,             1'b0,          1'b0,            1'b0,            1'b0,             1'b0           }),
-    .i_sdata ({ wb_bootrom_rdata, wb_sram_rdata, wb_ledpwm_rdata, wb_serial_rdata, wb_display_rdata, wb_spram_rdata })
+    .o_scyc  ({ wb_bootrom_cyc,   wb_sram_cyc,   wb_spram_cyc,   wb_peripherals_cyc   }),
+    .o_sstb  ({ wb_bootrom_stb,   wb_sram_stb,   wb_spram_stb,   wb_peripherals_stb   }),
+    .o_swe   ({ wb_bootrom_we,    wb_sram_we,    wb_spram_we,    wb_peripherals_we    }),
+    .o_saddr ({ wb_bootrom_addr,  wb_sram_addr,  wb_spram_addr,  wb_peripherals_addr  }),
+    .o_sdata ({ wb_bootrom_wdata, wb_sram_wdata, wb_spram_wdata, wb_peripherals_wdata }),
+    .o_ssel  ({ wb_bootrom_sel,   wb_sram_sel,   wb_spram_sel,   wb_peripherals_sel   }),
+    .i_sack  ({ wb_bootrom_ack,   wb_sram_ack,   wb_spram_ack,   wb_peripherals_ack   }),
+    .i_serr  ({ 1'b0,             1'b0,          1'b0,           wb_peripherals_err   }),
+    .i_sdata ({ wb_bootrom_rdata, wb_sram_rdata, wb_spram_rdata, wb_peripherals_rdata })
+  );
+
+  wbcrouter#(
+    .NS( 4 ), // Number of slaves
+    .AW( WB_XADDR_WIDTH - 8 ),
+    .DW( WB_DATA_WIDTH ),
+    .MUXWIDTH(4),
+    .SLAVE_MUX({
+        { 4'h0 },  // Base address of the PWM driver.           0x40000000
+        { 4'h1 },  // Base address of the USB Serial interface. 0x40010000
+        { 4'h2 },  // Base address of the LED Driver interface. 0x40020000
+        { 4'h3 }   // Base address of the SPI interface         0x40030000
+    })
+  ) vexrouter (
+    .i_clk  ( clk ),
+    .i_reset( rst ),
+
+    // Crossbar Master Ports.
+    .i_mcyc  ( wb_peripherals_cyc   ),
+    .i_mstb  ( wb_peripherals_stb   ),
+    .i_mwe   ( wb_peripherals_we    ),
+    .i_maddr ( wb_peripherals_addr[WB_XADDR_WIDTH-8-1:0] ),
+    .i_mdata ( wb_peripherals_wdata ),
+    .i_msel  ( wb_peripherals_sel   ),
+    .o_mack  ( wb_peripherals_ack   ),
+    .o_merr  ( wb_peripherals_err   ),
+    .o_mdata ( wb_peripherals_rdata ),
+
+    // Crossbar Slave Ports.
+    .o_scyc  ({ wb_ledpwm_cyc,   wb_serial_cyc,   wb_display_cyc,   wb_spi_cyc   }),
+    .o_sstb  ({ wb_ledpwm_stb,   wb_serial_stb,   wb_display_stb,   wb_spi_stb   }),
+    .o_swe   ({ wb_ledpwm_we,    wb_serial_we,    wb_display_we,    wb_spi_we    }),
+    .o_saddr ({ wb_ledpwm_addr,  wb_serial_addr,  wb_display_addr,  wb_spi_addr  }),
+    .o_sdata ({ wb_ledpwm_wdata, wb_serial_wdata, wb_display_wdata, wb_spi_wdata }),
+    .o_ssel  ({ wb_ledpwm_sel,   wb_serial_sel,   wb_display_sel,   wb_spi_sel   }),
+    .i_sack  ({ wb_ledpwm_ack,   wb_serial_ack,   wb_display_ack,   wb_spi_ack   }),
+    .i_serr  ({ 1'b0,            1'b0,            1'b0,             1'b0         }),
+    .i_sdata ({ wb_ledpwm_rdata, wb_serial_rdata, wb_display_rdata, wb_spi_rdata })
   );
   
 
@@ -344,7 +406,7 @@ module top (
   
   //---------------------------------------------------------------
   led_matrix #(
-    .ADDRESS_WIDTH   ( WB_ADDR_WIDTH ),
+    .ADDRESS_WIDTH   ( WB_SADDR_WIDTH ),
     .DATA_WIDTH      ( WB_DATA_WIDTH ),
     .BASE_ADDRESS    ( 0 )
   ) led_matrix_inst (
@@ -378,6 +440,83 @@ module top (
   
   assign debug = { 0 };
 
+
+  //---------------------------------------------------------------
+  // spi interface
+  wire                     spi_clk;
+  wire                     spi_sel;
+  wire [3:0]               spi_d_out;
+  wire [3:0]               spi_d_in;
+  wire [3:0]               spi_d_dir;
+  
+  spi_interface #(
+    .ADDRESS_WIDTH ( WB_SADDR_WIDTH ),
+    .DATA_WIDTH    ( 16 ),
+    .BASE_ADDRESS  ( 'h0000 ),
+    .MEM_ADDRESS   ( 'h1000 )
+  ) spi_interface_inst (
+    // Wishbone interface
+    .rst_i ( rst ),
+    .clk_i ( clk ),
+  
+    .adr_i ( wb_spi_addr           ),
+    .dat_i ( wb_spi_wdata[15:0]    ),
+    .dat_o ( {16'd0, wb_spi_rdata} ),
+    .we_i  ( wb_spi_we             ),
+    .sel_i ( wb_spi_sel[1:0]       ),
+    .stb_i ( wb_spi_stb            ),
+    .cyc_i ( wb_spi_cyc            ),
+    .ack_o ( wb_spi_ack            ),
+    .cti_i ( 0                     ),
+
+    .spi_clk   ( spi_clk   ),
+    .spi_sel   ( spi_sel   ),
+    .spi_d_out ( spi_d_out ),
+    .spi_d_in  ( spi_d_in  ),
+    .spi_d_dir ( spi_d_dir )
+  );
+
+  assign pin_sck = spi_clk;
+  assign pin_cs  = spi_sel;
+  
+  SB_IO #(
+    .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+    .PULLUP  ( 1'b0       )
+  ) iobuf_d0 (
+    .PACKAGE_PIN   ( pin_mosi     ),
+    .OUTPUT_ENABLE ( spi_d_dir[0] ),
+    .D_OUT_0       ( spi_d_out[0] ),
+    .D_IN_0        ( spi_d_in[0]  )
+  );
+  SB_IO #(
+    .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+    .PULLUP  ( 1'b0       )
+  ) iobuf_d1 (
+    .PACKAGE_PIN   ( pin_miso     ),
+    .OUTPUT_ENABLE ( spi_d_dir[1] ),
+    .D_OUT_0       ( spi_d_out[1] ),
+    .D_IN_0        ( spi_d_in[1]  )
+  );
+  SB_IO #(
+    .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+    .PULLUP  ( 1'b1       )
+  ) iobuf_d2 (
+    .PACKAGE_PIN   ( pin_wp       ),
+    .OUTPUT_ENABLE ( spi_d_dir[2] ),
+    .D_OUT_0       ( spi_d_out[2] ),
+    .D_IN_0        ( spi_d_in[2]  )
+  );
+  SB_IO #(
+    .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
+    .PULLUP  ( 1'b1       )
+  ) iobuf_d3 (
+    .PACKAGE_PIN   ( pin_hold     ),
+    .OUTPUT_ENABLE ( spi_d_dir[3] ),
+    .D_OUT_0       ( spi_d_out[3] ),
+    .D_IN_0        ( spi_d_in[3]  )
+  );
+  
+
   
   //---------------------------------------------------------------
   // uart and protocol
@@ -392,7 +531,7 @@ module top (
 
   // USB Serial Core.
   wb_usb_serial#(
-    .AW(WB_ADDR_WIDTH),
+    .AW( WB_SADDR_WIDTH ),
     .DW(WB_DATA_WIDTH)
   ) usb_serial(
     .wb_clk_i  (clk),
@@ -438,7 +577,7 @@ module top (
   wire [3:0] wb_ledpwm_output;
   
   wbledpwm#(
-    .AW(WB_ADDR_WIDTH),
+    .AW( WB_SADDR_WIDTH ),
     .DW(WB_DATA_WIDTH),
     .NLEDS(4)
   ) vexledpwm(
@@ -462,7 +601,7 @@ module top (
   //---------------------------------------------------------------
   // Boot ROM
   bootrom#(
-    .AW(WB_ADDR_WIDTH),
+    .AW(WB_XADDR_WIDTH),
     .DW(WB_DATA_WIDTH)
   ) vexbootrom(
     .wb_clk_i  (clk),
@@ -480,7 +619,7 @@ module top (
   //---------------------------------------------------------------
   // SRAM
   wbsram#(
-    .AW(WB_ADDR_WIDTH),
+    .AW(WB_XADDR_WIDTH),
     .DW(WB_DATA_WIDTH)
   ) vexsram(
     .wb_clk_i  ( clk ),
@@ -498,7 +637,7 @@ module top (
   //---------------------------------------------------------------
   // SPRAM
   wbspram #(
-    .AW ( WB_ADDR_WIDTH ),
+    .AW ( WB_XADDR_WIDTH ),
     .DW ( WB_DATA_WIDTH )
   ) spram_inst (
     // Wishbone interface.
@@ -518,57 +657,57 @@ module top (
   // Audio
 
 
-  reg [3:0] audio_volume;
-
-
-  wire signed [11:0] audio1;
-  wire               audio_valid;
-  pdm_mic #(
-    .SAMPLE_DEPTH      ( 12 ),
-    .FIR_SAMPLE_LENGTH ( 8192 ),
-    .INPUT_FREQUENCY   ( CLK_FREQ ),
-    .FREQUENCY         (  2000000 ),
-    .SAMPLE_FREQUENCY  ( 8000 )
-  ) mic_inst (
-    .clk ( clk ),
-    .rst ( rst ),
-
-    .mic_clk  ( pin_mic_clk ),
-    .mic_data ( pin_mic_data ),
-
-    .audio1 ( audio1 ),
-    .audio_valid ( audio_valid )
-  );
-
-  wire [11:0]        abs_audio  = ( audio1 >= 0 ? audio1 : -audio1 );
-
-  reg [11:0]         volume_value = 0;
-  
-  localparam UPDATE_COUNT = (12000000 / 200);
-  localparam UPDATE_COUNT_WIDTH = $clog2(UPDATE_COUNT);
-  reg [UPDATE_COUNT_WIDTH-1:0] update_counter;
-  always @(posedge clk) begin
-    if (abs_audio > volume_value) volume_value <= abs_audio;
-  
-    if (update_counter) update_counter <= update_counter - 1;
-    else begin
-      update_counter <= UPDATE_COUNT;
-  
-      audio_volume <= ( abs_audio[11] ? 10 :
-                        abs_audio[10] ? 10 :
-                        abs_audio[ 9] ?  8 :
-                        abs_audio[ 8] ?  6 :
-                        abs_audio[ 7] ?  4 :
-                        abs_audio[ 6] ?  3 :
-                        abs_audio[ 5] ?  2 :
-                        abs_audio[ 4] ?  1 :
-                        abs_audio[ 3] ?  0 :
-                        abs_audio[ 2] ?  0 :
-                        abs_audio[ 1] ?  0 : 0);
-      
-      volume_value <= 0;
-    end
-  end
+  //reg [3:0] audio_volume;
+  //
+  //
+  //wire signed [11:0] audio1;
+  //wire               audio_valid;
+  //pdm_mic #(
+  //  .SAMPLE_DEPTH      ( 12 ),
+  //  .FIR_SAMPLE_LENGTH ( 8192 ),
+  //  .INPUT_FREQUENCY   ( CLK_FREQ ),
+  //  .FREQUENCY         (  2000000 ),
+  //  .SAMPLE_FREQUENCY  ( 8000 )
+  //) mic_inst (
+  //  .clk ( clk ),
+  //  .rst ( rst ),
+  //
+  //  .mic_clk  ( pin_mic_clk ),
+  //  .mic_data ( pin_mic_data ),
+  //
+  //  .audio1 ( audio1 ),
+  //  .audio_valid ( audio_valid )
+  //);
+  //
+  //wire [11:0]        abs_audio  = ( audio1 >= 0 ? audio1 : -audio1 );
+  //
+  //reg [11:0]         volume_value = 0;
+  //
+  //localparam UPDATE_COUNT = (12000000 / 200);
+  //localparam UPDATE_COUNT_WIDTH = $clog2(UPDATE_COUNT);
+  //reg [UPDATE_COUNT_WIDTH-1:0] update_counter;
+  //always @(posedge clk) begin
+  //  if (abs_audio > volume_value) volume_value <= abs_audio;
+  //
+  //  if (update_counter) update_counter <= update_counter - 1;
+  //  else begin
+  //    update_counter <= UPDATE_COUNT;
+  //
+  //    audio_volume <= ( abs_audio[11] ? 10 :
+  //                      abs_audio[10] ? 10 :
+  //                      abs_audio[ 9] ?  8 :
+  //                      abs_audio[ 8] ?  6 :
+  //                      abs_audio[ 7] ?  4 :
+  //                      abs_audio[ 6] ?  3 :
+  //                      abs_audio[ 5] ?  2 :
+  //                      abs_audio[ 4] ?  1 :
+  //                      abs_audio[ 3] ?  0 :
+  //                      abs_audio[ 2] ?  0 :
+  //                      abs_audio[ 1] ?  0 : 0);
+  //    
+  //    volume_value <= 0;
+  //  end
+  //end
 
                    
   
@@ -583,45 +722,6 @@ module top (
   );
 
 
-  //assign pin_sck = spi_sck;
-  //SB_IO #(
-  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-  //  .PULLUP  ( 1'b0       )
-  //) iobuf_d0 (
-  //  .PACKAGE_PIN   ( pin_mosi     ),
-  //  .OUTPUT_ENABLE ( spi_d_dir[0] ),
-  //  .D_OUT_0       ( spi_d_out[0] ),
-  //  .D_IN_0        ( spi_d_in[0]  )
-  //);
-  //SB_IO #(
-  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-  //  .PULLUP  ( 1'b0       )
-  //) iobuf_d1 (
-  //  .PACKAGE_PIN   ( pin_miso     ),
-  //  .OUTPUT_ENABLE ( spi_d_dir[1] ),
-  //  .D_OUT_0       ( spi_d_out[1] ),
-  //  .D_IN_0        ( spi_d_in[1]  )
-  //);
-  //assign spi_d_in[2] = 0;
-  //assign spi_d_in[3] = 0;
-  //SB_IO #(
-  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-  //  .PULLUP  ( 1'b1       )
-  //) iobuf_d2 (
-  //  .PACKAGE_PIN   ( pin_wp       ),
-  //  .OUTPUT_ENABLE ( spi_d_dir[2] ),
-  //  .D_OUT_0       ( spi_d_out[2] ),
-  //  .D_IN_0        ( spi_d_in[2]  )
-  //);
-  //SB_IO #(
-  //  .PIN_TYPE( 6'b1010_01 ), // PIN_OUTPUT_TRISTATE - PIN_INPUT
-  //  .PULLUP  ( 1'b1       )
-  //) iobuf_d3 (
-  //  .PACKAGE_PIN   ( pin_hold     ),
-  //  .OUTPUT_ENABLE ( spi_d_dir[3] ),
-  //  .D_OUT_0       ( spi_d_out[3] ),
-  //  .D_IN_0        ( spi_d_in[3]  )
-  //);
 
   
 endmodule

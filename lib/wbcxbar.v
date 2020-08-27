@@ -5,6 +5,7 @@ module wbcxbar#(
     parameter DW = 32,
     parameter SW = DW/8,
     parameter MUXWIDTH = 3,
+    localparam SAW = AW - MUXWIDTH,
     parameter [NS*MUXWIDTH-1:0] SLAVE_MUX = {
         { 3'b111 },
         { 3'b110 },
@@ -16,8 +17,8 @@ module wbcxbar#(
         { 3'b000 }
     }
 ) (
-    input i_clk,
-    input i_reset,
+    input               i_clk,
+    input               i_reset,
 
     // Wishbone Master Signals.
     input [NM-1:0]      i_mcyc,
@@ -34,9 +35,9 @@ module wbcxbar#(
     output [NS-1:0]     o_scyc,
     output [NS-1:0]     o_sstb,
     output [NS-1:0]     o_swe,
-    output [NS*AW-1:0]  o_saddr,
+    output [NS*SAW-1:0] o_saddr,
     output [NS*DW-1:0]  o_sdata,
-    output [NS*SW-1:0] o_ssel,
+    output [NS*SW-1:0]  o_ssel,
     input [NS-1:0]      i_sack,
     input [NS*DW-1:0]   i_sdata,
     input [NS-1:0]      i_serr
@@ -135,12 +136,12 @@ generate
         assign m_serr[gS]  = i_serr[gS];
 
         // Wire outputs to master from the mux array.
-        assign o_scyc[gS]                   = m_mcyc[s_grant];
-        assign o_sstb[gS]                   = m_mstb[s_grant];
-        assign o_swe[gS]                    = m_mwe[s_grant];
-        assign o_saddr[AW+(gS*AW)-1:gS*AW]  = m_maddr[s_grant];
-        assign o_sdata[DW+(gS*DW)-1:gS*DW]  = m_mdata[s_grant];
-        assign o_ssel[SW+(gS*SW)-1:gS*SW]   = m_msel[s_grant];
+        assign o_scyc[gS]                     = m_mcyc[s_grant];
+        assign o_sstb[gS]                     = m_mstb[s_grant];
+        assign o_swe[gS]                      = m_mwe[s_grant];
+        assign o_saddr[SAW+(gS*SAW)-1:gS*SAW] = m_maddr[s_grant][SAW:0];
+        assign o_sdata[DW+(gS*DW)-1:gS*DW]    = m_mdata[s_grant];
+        assign o_ssel[SW+(gS*SW)-1:gS*SW]     = m_msel[s_grant];
     end
     // Fill the remainder of the mux array with empty data, to
     // set the un-selected state of the outputs to the master.

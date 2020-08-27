@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <printf.h>
 
-#define LED_PWM_BASE    (volatile uint32_t *)0x20000000
+#define LED_PWM_BASE    (volatile uint32_t *)0x40000000
 #define LED_PWM_COUNT   4
 
 // NS16650 Serial Interface
@@ -27,7 +27,7 @@ struct serial_regmap {
     serial_reg_t    msr;    // Modem Status Register.
     serial_reg_t    scratch; // Scratch Value Register.
 } __attribute__((packed));
-#define SERIAL ((volatile struct serial_regmap *)0x30000000)
+#define SERIAL ((volatile struct serial_regmap *)0x40010000)
 
 static void serial_putc(int ch)
 {
@@ -75,10 +75,10 @@ int main(void)
 
     for (y = 0; y < 14; y++) {
         for (x = 0; x < 32; x++) {
-            *(uint16_t*)(0x40000004 + (x<<1) + (y<<6)) = x<<11 | y<<1;
+            *(uint16_t*)(0x40020004 + (x<<1) + (y<<6)) = x<<11 | y<<1;
         }
     }
-    *(uint16_t*)(0x40000000) = 4;
+    *(uint16_t*)(0x40020000) = 4;
 
     ledpwm[0] = 0;
     ledpwm[1] = 1;
@@ -94,18 +94,29 @@ int main(void)
             count++;
 
             if (ch == 0x20) {
-                *(uint8_t*)(0x50000008) = 0x5A;
-                *(uint8_t*)(0x50000009) = 0x01;
-                *(uint8_t*)(0x5000000A) = 0x02;
-                *(uint8_t*)(0x5000000B) = 0x03;
-                printf(" u8: %08X\n\r", *(volatile uint32_t*)(0x50000008));
+                *(uint8_t*)(0x10000008) = 0x5A;
+                *(uint8_t*)(0x10000009) = 0x01;
+                *(uint8_t*)(0x1000000A) = 0x02;
+                *(uint8_t*)(0x1000000B) = 0x03;
+                printf(" u8: %08X\n\r", *(volatile uint32_t*)(0x10000008));
 
-                *(uint16_t*)(0x5000000C) = 0x345A;
-                *(uint16_t*)(0x5000000E) = 0x0102;
-                printf("u16: %08X\n\r", *(volatile uint32_t*)(0x5000000C));
+                *(uint16_t*)(0x1000000C) = 0x345A;
+                *(uint16_t*)(0x1000000E) = 0x0102;
+                printf("u16: %08X\n\r", *(volatile uint32_t*)(0x1000000C));
 
-                *(uint32_t*)(0x50000010) = 0x0607345A;
-                printf("u32: %08X\n\r", *(volatile uint32_t*)(0x50000010));
+                *(uint32_t*)(0x10000010) = 0x0607345A;
+                printf("u32: %08X\n\r", *(volatile uint32_t*)(0x10000010));
+
+                printf("array write/read\n\r");
+                for (i = 0; i < 16; i++) {
+                    *(volatile uint16_t*)(0x10001000+(i<<1)) = i;
+                }
+                for (i = 0; i < 16; i++) {
+                    printf("%08X\n\r", *(volatile uint16_t*)(0x10001000+(i<<1)));
+                }
+                for (i = 0; i < 8; i++) {
+                    printf("%08X\n\r", *(volatile uint32_t*)(0x10001000+(i<<2)));
+                }
             }
             
 #if 1
