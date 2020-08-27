@@ -2,6 +2,7 @@ module wbcdecoder#(
     parameter ADDRWIDTH = 32,
     parameter OUTWIDTH = 4,
     parameter MUXWIDTH = 3,
+    parameter NS = 8,
     parameter SLAVE_MUX = {
         { 3'b111 },
         { 3'b110 },
@@ -16,8 +17,6 @@ module wbcdecoder#(
     input [ADDRWIDTH-1:0] addr,
     output reg [OUTWIDTH-1:0] decode
 );
-
-localparam NS = $size(SLAVE_MUX) / MUXWIDTH;
 
 wire [NS-1:0] addr_hit;
 wire [MUXWIDTH-1:0] addr_top;

@@ -459,15 +459,15 @@ module top (
     .rst_i ( rst ),
     .clk_i ( clk ),
   
-    .adr_i ( wb_spi_addr           ),
-    .dat_i ( wb_spi_wdata[15:0]    ),
-    .dat_o ( {16'd0, wb_spi_rdata} ),
-    .we_i  ( wb_spi_we             ),
-    .sel_i ( wb_spi_sel[1:0]       ),
-    .stb_i ( wb_spi_stb            ),
-    .cyc_i ( wb_spi_cyc            ),
-    .ack_o ( wb_spi_ack            ),
-    .cti_i ( 0                     ),
+    .adr_i ( wb_spi_addr        ),
+    .dat_i ( wb_spi_wdata[15:0] ),
+    .dat_o ( wb_spi_rdata[15:0] ),
+    .we_i  ( wb_spi_we          ),
+    .sel_i ( wb_spi_sel[1:0]    ),
+    .stb_i ( wb_spi_stb         ),
+    .cyc_i ( wb_spi_cyc         ),
+    .ack_o ( wb_spi_ack         ),
+    .cti_i ( 0                  ),
 
     .spi_clk   ( spi_clk   ),
     .spi_sel   ( spi_sel   ),
@@ -475,6 +475,7 @@ module top (
     .spi_d_in  ( spi_d_in  ),
     .spi_d_dir ( spi_d_dir )
   );
+  assign wb_spi_rdata[31:16] = 0;
 
   assign pin_sck = spi_clk;
   assign pin_cs  = spi_sel;

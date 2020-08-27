@@ -1,11 +1,14 @@
-module wbcrouter#(
+`timescale 1ns/100ps
+`default_nettype none
+
+module wbcrouter #(
     parameter NS = 8,
     parameter AW = 32,
     parameter DW = 32,
     parameter SW = DW/8,
     parameter MUXWIDTH = 3,
-    localparam SAW = AW - MUXWIDTH,
-    parameter [NS*MUXWIDTH-1:0] SLAVE_MUX = {
+    localparam SAW = (AW - MUXWIDTH),
+    parameter [NS*MUXWIDTH-1:0] SLAVE_MUX = ({
         { 3'b111 },
         { 3'b110 },
         { 3'b101 },
@@ -14,7 +17,7 @@ module wbcrouter#(
         { 3'b010 },
         { 3'b001 },
         { 3'b000 }
-    }
+    })
 ) (
     input wire               i_clk,
     input wire               i_reset,
@@ -51,6 +54,7 @@ module wbcrouter#(
   
   // Muxing Selections.
   wire [M_GRANT_BITS-1:0] m_decode;   /* Decoded slave the master is requesting. */
+  wire [M_GRANT_SIZE-1:0] m_decode_decoded;
 
   genvar                  gS;
   integer                 iS;
@@ -61,8 +65,9 @@ module wbcrouter#(
     // Decode the master address.
     wbcdecoder#(
       .ADDRWIDTH(AW),
-      .MUXWIDTH(MUXWIDTH),
-      .OUTWIDTH(M_GRANT_BITS),
+      .MUXWIDTH (MUXWIDTH),
+      .OUTWIDTH (M_GRANT_BITS),
+      .NS       (NS),
       .SLAVE_MUX(SLAVE_MUX)
     ) m_decode_inst (
       .addr(i_maddr),
@@ -73,18 +78,19 @@ module wbcrouter#(
     // Slave Decoding and Multiplexing
     ///////////////////////////////////
     for (gS = 0; gS < NS; gS = gS + 1) begin
+      assign m_decode_decoded[gS] = (gS == m_decode);
       // Wire inputs from slave to the mux array.
       assign m_sack[gS]  = i_sack[gS];
       assign m_sdata[gS] = i_sdata[DW+(gS*DW)-1:gS*DW];
       assign m_serr[gS]  = i_serr[gS];
 
       // Wire outputs to master from the mux array.
-      assign o_scyc[gS]                     = m_decode[gS] & i_mcyc;
-      assign o_sstb[gS]                     = m_decode[gS] & i_mstb;
-      assign o_swe[gS]                      = m_decode[gS] & i_mwe;
-      assign o_saddr[SAW+(gS*SAW)-1:gS*SAW] = {SAW{m_decode[gS]}} & i_maddr[SAW:0];
-      assign o_sdata[DW+(gS*DW)-1:gS*DW]    = {DW{m_decode[gS]}} & i_mdata;
-      assign o_ssel[SW+(gS*SW)-1:gS*SW]     = {SW{m_decode[gS]}} & i_msel;
+      assign o_scyc[gS]                     = m_decode_decoded[gS] & i_mcyc;
+      assign o_sstb[gS]                     = m_decode_decoded[gS] & i_mstb;
+      assign o_swe[gS]                      = m_decode_decoded[gS] & i_mwe;
+      assign o_saddr[SAW+(gS*SAW)-1:gS*SAW] = {SAW{m_decode_decoded[gS]}} & i_maddr[SAW:0];
+      assign o_sdata[DW+(gS*DW)-1:gS*DW]    = {DW{m_decode_decoded[gS]}} & i_mdata;
+      assign o_ssel[SW+(gS*SW)-1:gS*SW]     = {SW{m_decode_decoded[gS]}} & i_msel;
     end
     // Fill the remainder of the mux array with empty data, to
     // set the un-selected state of the outputs to the master.
@@ -101,8 +107,8 @@ module wbcrouter#(
       o_mdata = 0;
       o_merr  = 0;
 
-      for (iS = 0; iS < M_GRANT_BITS; iS = iS + 1) begin
-        if (m_decode[iS]) begin
+      for (iS = 0; iS < M_GRANT_SIZE; iS = iS + 1) begin
+        if (m_decode_decoded[iS]) begin
           o_mack  = m_sack[iS];
           o_mdata = m_sdata[iS];
           o_merr  = m_serr[iS];
@@ -110,5 +116,7 @@ module wbcrouter#(
       end
     end
     
-endgenerate
+  endgenerate
 endmodule
+
+`default_nettype wire
