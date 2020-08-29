@@ -92,8 +92,9 @@ generate
         // Decode the master address.
         wbcdecoder#(
             .ADDRWIDTH(AW),
-            .MUXWIDTH(MUXWIDTH),
-            .OUTWIDTH(M_GRANT_BITS),
+            .MUXWIDTH (MUXWIDTH),
+            .OUTWIDTH (M_GRANT_BITS),
+            .NS       (NS),
             .SLAVE_MUX(SLAVE_MUX)
         ) m_decode_inst (
             .addr(m_maddr[gM]),
