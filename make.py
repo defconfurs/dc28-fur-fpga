@@ -55,7 +55,8 @@ stub_usb_srcs += ["usb_serial_core.v",
 lib_srcs = ["VexRiscv_MinRvc.v",
             "wbcdecoder.v",
             "wbcxbar.v",
-            "wbcrouter.v"]
+            "wbcrouter.v",
+            "wb_qspi_flash.v"]
 
 sources = glob(os.path.join(srcdir, '*.v'))
 sources += [ os.path.join(rtl_usb_dir, x) for x in stub_usb_srcs ]

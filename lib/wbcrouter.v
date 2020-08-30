@@ -98,6 +98,7 @@ module wbcrouter #(
       assign m_sdata[gS] = {DW{1'b0}};
       assign m_sack[gS]  = 1'b0;
       assign m_serr[gS]  = 1'b0;
+      assign m_decode_decoded[gS] = 0;
     end
 
     // Connect up the slave to the master

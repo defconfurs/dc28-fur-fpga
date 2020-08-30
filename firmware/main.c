@@ -94,28 +94,32 @@ int main(void)
             count++;
 
             if (ch == 0x20) {
-                *(uint8_t*)(0x10000008) = 0x5A;
-                *(uint8_t*)(0x10000009) = 0x01;
-                *(uint8_t*)(0x1000000A) = 0x02;
-                *(uint8_t*)(0x1000000B) = 0x03;
-                printf(" u8: %08X\n\r", *(volatile uint32_t*)(0x10000008));
+                //*(uint8_t*)(0x10000008) = 0x5A;
+                //*(uint8_t*)(0x10000009) = 0x01;
+                //*(uint8_t*)(0x1000000A) = 0x02;
+                //*(uint8_t*)(0x1000000B) = 0x03;
+                //printf(" u8: %08X\n\r", *(volatile uint32_t*)(0x10000008));
+                //
+                //*(uint16_t*)(0x1000000C) = 0x345A;
+                //*(uint16_t*)(0x1000000E) = 0x0102;
+                //printf("u16: %08X\n\r", *(volatile uint32_t*)(0x1000000C));
+                //
+                //*(uint32_t*)(0x10000010) = 0x0607345A;
+                //printf("u32: %08X\n\r", *(volatile uint32_t*)(0x10000010));
+                //
+                //printf("array write/read\n\r");
+                //for (i = 0; i < 16; i++) {
+                //    *(volatile uint16_t*)(0x10001000+(i<<1)) = i;
+                //}
+                //for (i = 0; i < 16; i++) {
+                //    printf("%08X\n\r", *(volatile uint16_t*)(0x10001000+(i<<1)));
+                //}
+                //for (i = 0; i < 8; i++) {
+                //    printf("%08X\n\r", *(volatile uint32_t*)(0x10001000+(i<<2)));
+                //}
 
-                *(uint16_t*)(0x1000000C) = 0x345A;
-                *(uint16_t*)(0x1000000E) = 0x0102;
-                printf("u16: %08X\n\r", *(volatile uint32_t*)(0x1000000C));
-
-                *(uint32_t*)(0x10000010) = 0x0607345A;
-                printf("u32: %08X\n\r", *(volatile uint32_t*)(0x10000010));
-
-                printf("array write/read\n\r");
-                for (i = 0; i < 16; i++) {
-                    *(volatile uint16_t*)(0x10001000+(i<<1)) = i;
-                }
-                for (i = 0; i < 16; i++) {
-                    printf("%08X\n\r", *(volatile uint16_t*)(0x10001000+(i<<1)));
-                }
-                for (i = 0; i < 8; i++) {
-                    printf("%08X\n\r", *(volatile uint32_t*)(0x10001000+(i<<2)));
+                for (i = 0; i < 32; i++) {
+                    printf("%08X\n\r", *(volatile uint32_t*)(0x30000000+(i<<2)));
                 }
             }
             
