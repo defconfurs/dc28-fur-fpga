@@ -10,7 +10,7 @@ libdir = os.path.join(srcdir, "lib")
 firmwaredir = os.path.join(srcdir, "firmware")
 ldsfile = os.path.join(firmwaredir,'firmware.lds')
 
-CFLAGS = ['-v','-O2', '-march=rv32ic', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
+CFLAGS = ['-v','-Os', '-march=rv32ic', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
 CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_FLOAT=1', '-DPRINTF_DISABLE_SUPPORT_EXPONENTIAL=1']
 CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_LONG_LONG=1', '-DPRINTF_DISABLE_SUPPORT_PTRDIFF_T=1']
 LDFLAGS = CFLAGS + ['-Wl,-Bstatic,-T,'+ldsfile+',--gc-sections']

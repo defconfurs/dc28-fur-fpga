@@ -1,44 +1,123 @@
 `include "globals.vh"
 
 module led_matrix #(
-    parameter ADDRESS_WIDTH    = 30,
-    parameter DATA_WIDTH       = 32,
-    localparam DATA_BYTES      = DATA_WIDTH/8,
-    parameter BASE_ADDRESS     = 0
+    parameter AW = 32,
+    parameter DW = 32
 )  (
-  // Wishbone interface
-  input wire                      rst_i,
-  input wire                      clk_i,
+    // Wishbone interface.
+    input wire            wb_clk_i,
+    input wire            wb_reset_i,
+    input wire [AW-1:0]   wb_adr_i,
+    input wire [DW-1:0]   wb_dat_i,
+    output wire [DW-1:0]  wb_dat_o,
+    input wire            wb_we_i,
+    input wire [DW/8-1:0] wb_sel_i,
+    output reg            wb_ack_o,
+    input wire            wb_cyc_i,
+    input wire            wb_stb_i,
 
-  input wire [ADDRESS_WIDTH-1:0]  adr_i,
-  input wire [DATA_WIDTH-1:0]     dat_i,
-  output reg [DATA_WIDTH-1:0]     dat_o,
-  input wire                      we_i,
-  input wire [DATA_BYTES-1:0]     sel_i,
-  input wire                      stb_i,
-  input wire                      cyc_i,
-  output reg                      ack_o,
-  input wire [2:0]                cti_i,
+    // LED Drive Out
+    output reg [3:0]      latch_row_bank,
+    output reg [7:0]      row_data,
+    output wire           row_oe,
+    output wire           col_first,
+    output wire           col_advance,
+    output wire           col_rclk,
 
-  // LED Drive Out
-  output reg [3:0]                latch_row_bank,
-  output reg [7:0]                row_data,
-  output wire                     row_oe,
-  output wire                     col_first,
-  output wire                     col_advance,
-  output wire                     col_rclk,
-
-  // extra control signals
-  output wire                     frame_complete,
+    // extra control signals
+    output wire           frame_complete,
     
-  input wire [15:0]               debug
+    input wire [15:0]     debug
   );
 
-  wire [15:0] localdebug;
+    reg ram_ready;
+    
+    ///////////////////////////////////////
+    // The SRAM memory block.
+    ///////////////////////////////////////
+    wire   stb_valid;
+    assign stb_valid = wb_cyc_i && wb_stb_i && ~wb_ack_o;
+    wire   ram_stb_valid;
+    assign ram_stb_valid = wb_adr_i != 0 && ram_ready & stb_valid;
+    
+    always @(posedge wb_clk_i) begin
+        if (wb_adr_i == 0) wb_ack_o <= stb_valid;
+        else               wb_ack_o <= ram_stb_valid;
+    end
+    
+    wire   write_cycle;
+    assign write_cycle = stb_valid | wb_we_i;
+
+    reg [14:0] frame_address;
+    reg [14:0] latched_frame_address;
+
+    wire [31:0] raminst_data_out;
+    reg [31:0]  raminst_data_in;
+    reg [13:0]  raminst_address;
+    reg [7:0]   raminst_maskwen;
+
+    wire [14:0] ram_address;
+    wire [15:0] ram_data_in;
+    reg [15:0]  ram_data_out;
+    
+    always @(*) begin
+        if (ram_ready) begin
+            raminst_maskwen = ({ wb_sel_i[3], wb_sel_i[3], wb_sel_i[2], wb_sel_i[2], wb_sel_i[1], wb_sel_i[1], wb_sel_i[0], wb_sel_i[0] } & { (2*DW/8) { wb_we_i }});
+            raminst_data_in = wb_dat_i;
+            raminst_address = wb_adr_i[13:0];
+            wb_dat_o        = wb_adr_i == 0 ? {frame_address != latched_frame_address, 15'd0,  frame_address, 1'b0 } : raminst_data_out;
+            ram_data_out    = 16'h001F;
+        end
+        else begin
+            raminst_maskwen = 8'hFF;
+            raminst_data_in = 0;
+            raminst_address = ram_address[14:1];
+            ram_data_out    = ram_address[0] ? raminst_data_out[31:16] : raminst_data_out[15:0];
+            wb_dat_o        = wb_adr_i == 0 ? {frame_address != latched_frame_address, 15'd0,  frame_address, 1'b0 } : 0;;
+        end
+    end
+
+    always @(posedge wb_clk_i or posedge wb_reset_i) begin
+        if (wb_reset_i) frame_address <= `DEFAULT_FRAME_ADDRESS;
+        else if (wb_adr_i == 0 && stb_valid && wb_we_i) begin
+            frame_address <= wb_dat_i[15:1];
+        end
+    end
+
   
+    SB_SPRAM256KA ramfn_inst1 (
+        .CLOCK      ( wb_clk_i ),
+        .STANDBY    (1'b0),
+        .SLEEP      (1'b0),
+        .POWEROFF   (1'b1),
+    
+        .ADDRESS    ( raminst_address ),
+        .DATAIN     ( raminst_data_in[15:0] ),
+        .MASKWREN   ( raminst_maskwen[3:0] ),
+        .WREN       ( (wb_sel_i[1] | wb_sel_i[0]) && wb_we_i && ram_stb_valid ),
+        .CHIPSELECT ( 1 ),
+        .DATAOUT    ( raminst_data_out[15:0] )
+    );
+  
+    SB_SPRAM256KA ramfn_inst2 (
+        .CLOCK      ( wb_clk_i ),
+        .STANDBY    (1'b0),
+        .SLEEP      (1'b0),
+        .POWEROFF   (1'b1),
+     
+        .ADDRESS    ( raminst_address ),
+        .DATAIN     ( raminst_data_in[31:16] ),
+        .MASKWREN   ( raminst_maskwen[7:4] ),
+        .WREN       ( (wb_sel_i[3] | wb_sel_i[2]) && wb_we_i && ram_stb_valid ),
+        .CHIPSELECT ( 1 ),
+        .DATAOUT    ( raminst_data_out[31:16] )
+    );
+
+
+
   localparam N_COLS             = 10;
   localparam N_ROWS             = 14;
-  localparam SHIFT_CLOCK_PERIOD = 64;
+  localparam SHIFT_CLOCK_PERIOD = 60;
   localparam TOTAL_LOAD_TIME    = 2 * N_COLS / 2;
   localparam TOTAL_LINE_TIME    = 'h400; // don't forget to update for the maximum PWM time
 
@@ -54,113 +133,17 @@ module led_matrix #(
   // alias so it's easier to type
   wire       clk;
   wire       rst;
-  assign clk = clk_i;
-  assign rst = rst_i;
+  assign clk = wb_clk_i;
+  assign rst = wb_reset_i;
 
   reg [31:0] led_out_state;
 
 
-  localparam MEM_ADDR_WIDTH = 14;
 
-  reg                       mem_busy;
-  wire [MEM_ADDR_WIDTH-1:0] ram_address;
-  wire [15:0]               ram_data_in;
-  reg [15:0]                ram_data_out;
-  wire                      ram_we;
 
-  
-  wire [MEM_ADDR_WIDTH-1:0] wb_mem_address;
-  wire [15:0]               wb_mem_data_out;
-  wire [15:0]               wb_mem_data_in;
-  wire                      wb_mem_we;
-
-  
-  // control registers
-  reg [MEM_ADDR_WIDTH-1:0] frame_address;
-  reg [MEM_ADDR_WIDTH-1:0] latched_frame_address;
-
-  assign localdebug = latched_frame_address;
-  
-  //===========================================================================================
-  // Wishbone slave
-  wire       address_in_range;
-  assign address_in_range = adr_i == BASE_ADDRESS && |sel_i[1:0];
-
-  wire [13:0] local_address;
-  wire        upper_hword;
-  assign upper_hword = !(|sel_i[1:0]);
-  assign wb_mem_address = { adr_i[MEM_ADDR_WIDTH-1:0], upper_hword };
-  
-  wire       masked_cyc = (cyc_i);
-  assign wb_mem_we = (stb_i & |we_i);
-  assign wb_mem_data_in = upper_hword ? dat_i[31:16] : dat_i[15:0];
-
-  always @(posedge clk_i) begin
-    if (!address_in_range && mem_busy) ack_o = 0;
-    else ack_o <= masked_cyc;
-  end
-
-  // note - this is hard-coded for only one register at address 0
-  always @(posedge clk_i or posedge rst_i) begin
-    if (rst_i) begin
-      frame_address     <= `DEFAULT_FRAME_ADDRESS;
-    end
-    else begin
-      if (masked_cyc & we_i & address_in_range) begin
-        frame_address <= dat_i[MEM_ADDR_WIDTH+1-1:1];
-      end
-    end
-  end
-
-  // note - this is hard-coded for only one register at address 0
-  always @(*) begin
-    if (~masked_cyc)           dat_o = 0;
-    else if (address_in_range) dat_o = { frame_address, 1'b0 };
-    else                       dat_o = upper_hword ? { wb_mem_data_out, 16'd0 } : { 16'd0, wb_mem_data_out };
-  end
 
   //===========================================================================================
-  // Wishbone Master - Pixel Reader
-
-  assign ram_data_in = 0;
-  
-  reg [MEM_ADDR_WIDTH-1:0]  raminst_address;
-  reg [15:0]                raminst_data_in;
-  wire [15:0]               raminst_data_out;
-  reg [1:0]                 raminst_wen;
-  always @(*) begin
-    if (mem_busy) begin
-      raminst_wen     = { ram_we, ram_we };
-      raminst_data_in = ram_data_in;
-      raminst_address = ram_address;
-      ram_data_out    = raminst_data_out;
-      wb_mem_data_out = 0;
-    end
-    else begin
-      raminst_wen     = (sel_i[3:2] | sel_i[1:0]) & { DATA_BYTES { wb_mem_we }};
-      raminst_data_in = wb_mem_data_in;
-      raminst_address = wb_mem_address;
-      wb_mem_data_out = raminst_data_out;
-      ram_data_out    = 0;
-    end
-  end
-  assign ram_we = 0;
-  
-  reg [MEM_ADDR_WIDTH-1:0]  latched_address;
-  always @(posedge clk_i) latched_address <= raminst_address;
-  SB_SPRAM256KA ram00
-  (
-    .ADDRESS    (raminst_address),
-    .DATAIN     (raminst_data_in),
-    .MASKWREN   ({raminst_wen[1], raminst_wen[1], raminst_wen[0], raminst_wen[0]}),
-    .WREN       (raminst_wen[0] | raminst_wen[1]),
-    .CHIPSELECT (1),
-    .CLOCK      (clk_i),
-    .STANDBY    (1'b0),
-    .SLEEP      (1'b0),
-    .POWEROFF   (1'b1),
-    .DATAOUT    (raminst_data_out)
-  );
+  // Pixel Reader
   
   localparam FIELD_RED   = 3'b001;
   localparam FIELD_GREEN = 3'b010;
@@ -173,10 +156,10 @@ module led_matrix #(
     if (latched_frame_address == 0) pixel_out <= 0;
     else begin
       case (current_field)
-      FIELD_RED:   pixel_out <= { raminst_data_out[15:11], 1'b0 };
-      FIELD_GREEN: pixel_out <= { raminst_data_out[10:5] };
-      FIELD_BLUE:  pixel_out <= { raminst_data_out[4:0], 1'b0 };
-      default:     pixel_out <= { raminst_data_out[4:0], 1'b0 };
+      FIELD_RED:   pixel_out <= { ram_data_out[15:11], 1'b0 };
+      FIELD_GREEN: pixel_out <= { ram_data_out[10:5] };
+      FIELD_BLUE:  pixel_out <= { ram_data_out[4:0], 1'b0 };
+      default:     pixel_out <= { ram_data_out[4:0], 1'b0 };
       endcase
     end
   end
@@ -232,11 +215,11 @@ module led_matrix #(
 
   wire [4:0] xpos;
   wire [3:0] ypos;
-  assign xpos = { current_col, pixel_being_updated[0] };
+  assign xpos = { current_col, pixel_being_updated[0] ^ pixel_being_updated[1] };
   assign ypos = { pixel_being_updated[4:1] };
 
   assign ram_address = (latched_frame_address + 
-                        { ypos, xpos[4:1], xpos[0]^ypos[0] });
+                        { ypos[3:0], xpos[4:0] });
 
 
   //==============================
@@ -270,7 +253,7 @@ module led_matrix #(
   integer i;
   always @(posedge clk or posedge rst) begin
     if (rst) begin
-      mem_busy              <= 0;
+      ram_ready             <= 1;
       col_timer             <= TOTAL_LINE_TIME;
       load_state            <= LOAD_STATE_START_REQUEST;
       current_field         <= FIELD_BLUE;
@@ -282,11 +265,11 @@ module led_matrix #(
     
     else begin
       if (col_timer) begin
-        col_timer      <= col_timer - 1;
+          col_timer      <= col_timer - 1;
         
-        load_timer     <= TOTAL_LOAD_TIME;
-        mem_busy       <= 0;
-        frame_complete <= 1;
+          load_timer     <= TOTAL_LOAD_TIME;
+          ram_ready      <= 1;
+          frame_complete <= 1;
       end
       else begin // new col
         if (load_timer) load_timer <= load_timer -1;
@@ -294,23 +277,25 @@ module led_matrix #(
         
         case (load_state)
         LOAD_STATE_START_REQUEST: begin
-          mem_busy       <= 1;
-          frame_complete <= 0;
-          load_state     <= LOAD_STATE_REQUEST_DELAY;
+            frame_complete <= 0;
+            if (!ram_stb_valid) begin
+                load_state <= LOAD_STATE_REQUEST_DELAY;
+                ram_ready  <= 0;
+            end
         end
         
         LOAD_STATE_REQUEST_DELAY: begin
-          mem_busy   <= 1;
-          load_state <= LOAD_STATE_COMPLETE_REQUEST;
+            ram_ready  <= 0;
+            load_state <= LOAD_STATE_COMPLETE_REQUEST;
         end
         
         LOAD_STATE_COMPLETE_REQUEST: begin
-          mem_busy   <= 0;
+          ram_ready  <= 0;
           load_state <= LOAD_STATE_GET_VALUE;
         end
         
         LOAD_STATE_GET_VALUE: begin
-          mem_busy <= 0;
+          ram_ready  <= 1;
           
           for (i = 0; i < N_ROWS<<1; i = i+1) begin
             if (i == pixel_being_updated) begin
@@ -338,7 +323,7 @@ module led_matrix #(
         end
         
         LOAD_STATE_LOAD_WAIT: begin
-          mem_busy <= 0;
+          ram_ready  <= 1;
 
           if (!load_timer) begin
             load_state <= LOAD_STATE_START_REQUEST;
@@ -452,8 +437,8 @@ module led_matrix #(
 
   assign row_oe      = 0;
   assign col_first   = (current_col == 0) && (current_field == FIELD_BLUE);
-  assign col_advance = shift_clock_counter < (SHIFT_CLOCK_PERIOD >> 4) && shift_clock_counter > 0;
-  assign col_rclk    = shift_clock_counter > (SHIFT_CLOCK_PERIOD >> 4) && shift_clock_counter > 0;
+  assign col_advance = !shift_clock_counter[SHIFT_CLOCK_COUNTER_SIZE-1] && shift_clock_counter > 0;
+  assign col_rclk    =  shift_clock_counter[SHIFT_CLOCK_COUNTER_SIZE-1] && shift_clock_counter > 0;
   
   
 endmodule

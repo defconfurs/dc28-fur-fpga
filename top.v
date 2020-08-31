@@ -332,9 +332,9 @@ module top (
       .MUXWIDTH(4),
       .NS( 3 ), // Number of slaves
       .SLAVE_MUX({
-          { 4'h0 },  // Base address of the LED Driver interface. 0x40020000
+          { 4'h0 },  // Base address of the misc registers        0x40000000
           { 4'h1 },  // Base address of the USB Serial interface. 0x40010000
-          { 4'h2 }   // Base address of the PWM driver.           0x40000000
+          { 4'h2 }   // Base address of the LED Driver interface. 0x40020000
       })
     ) vexrouter (
       .i_clk  ( clk ),
@@ -406,24 +406,21 @@ module top (
     
     //---------------------------------------------------------------
     led_matrix #(
-      .ADDRESS_WIDTH   ( WB_SADDR_WIDTH ),
-      .DATA_WIDTH      ( WB_DATA_WIDTH ),
-      .BASE_ADDRESS    ( 0 )
+      .AW ( WB_SADDR_WIDTH ),
+      .DW ( WB_DATA_WIDTH )
     ) led_matrix_inst (
       // Wishbone interface
-      .rst_i ( rst ),
-      .clk_i ( clk ),
-    
-      .adr_i ( wb_display_addr  ),
-      .dat_i ( wb_display_wdata ),
-      .dat_o ( wb_display_rdata ),
-      .we_i  ( wb_display_we    ),
-      .sel_i ( wb_display_sel   ),
-      .stb_i ( wb_display_stb   ),
-      .cyc_i ( wb_display_cyc   ),
-      .ack_o ( wb_display_ack   ),
-      .cti_i ( 0                ),
-    
+      .wb_clk_i   ( clk ),
+      .wb_reset_i ( rst ),
+      .wb_adr_i   ( wb_display_addr  ),
+      .wb_dat_i   ( wb_display_wdata ),
+      .wb_dat_o   ( wb_display_rdata ),
+      .wb_we_i    ( wb_display_we    ),
+      .wb_sel_i   ( wb_display_sel   ),
+      .wb_ack_o   ( wb_display_ack   ),
+      .wb_cyc_i   ( wb_display_cyc   ),
+      .wb_stb_i   ( wb_display_stb   ),
+
       // LED Drive Out
       .latch_row_bank ( latch_row_bank ),
       .row_data       ( row_data       ),
@@ -502,7 +499,7 @@ module top (
     //---------------------------------------------------------------
     // wishbone connected LED PWM driver
     wire [1:0] buttons;
-    reg [11:0] audio;
+    wire [11:0] audio;
 
     assign buttons = { pin_button_up, pin_button_down };
     
@@ -660,14 +657,11 @@ module top (
     //---------------------------------------------------------------
     // Audio
   
-    wire signed [11:0] audio1;
-    wire               audio_valid;
     pdm_mic #(
       .SAMPLE_DEPTH      ( 12 ),
       .FIR_SAMPLE_LENGTH ( 8192 ),
       .INPUT_FREQUENCY   ( CLK_FREQ ),
-      .FREQUENCY         (  2000000 ),
-      .SAMPLE_FREQUENCY  ( 8000 )
+      .FREQUENCY         (  2000000 )
     ) mic_inst (
       .clk ( clk ),
       .rst ( rst ),
@@ -675,12 +669,9 @@ module top (
       .mic_clk  ( pin_mic_clk ),
       .mic_data ( pin_mic_data ),
     
-      .audio1 ( audio1 ),
-      .audio_valid ( audio_valid )
+      .audio1 ( audio )
     );
 
-    always @(posedge clk) if (audio_valid) audio <= audio1;
-    
                      
     
   

@@ -53,6 +53,73 @@ static void serial_puthex(int value)
     serial_putc(nibble >= 10 ? ('A'+nibble-10) : ('0'+nibble));
 }
 
+static void update_frame(int framenum) {
+    int x, y;
+    int address;
+    int offset;
+
+    offset = framenum >> 2;
+
+    static const uint16_t colours[] = {
+        0xF800,
+        0xF300,
+        0xF5E0,
+        0x07C0,
+        0x001F,
+        0x7817,
+        0xFFFF
+    };
+
+    static const uint32_t bitmap[] = {
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+        0b11111111111111111111111111111111,
+    };
+        
+    
+    if (framenum & 1) address = 0x40020004;
+    else              address = 0x40020404;
+    
+    for (y = 0; y < 14; y++) {
+        for (x = 0; x < 10; x++) {
+            if (bitmap[y] & (0x80000000 >> x)) *(uint16_t*)(address + ((  x )<<1) + (y<<6)) = colours[(offset + (x>>1) + (y>>1)) % 6];
+            else                               *(uint16_t*)(address + ((  x )<<1) + (y<<6)) = 0;
+            if (bitmap[y] & (0x00001000 << x)) *(uint16_t*)(address + ((19-x)<<1) + (y<<6)) = colours[(offset + (x>>1) + (y>>1)) % 6];
+            else                               *(uint16_t*)(address + ((19-x)<<1) + (y<<6)) = 0;
+        }
+    }
+    *(uint16_t*)(0x40020000) = address & 0x7FFF;
+}
+
+static int cursor_x, cursor_y;
+static void update_frame_point(int framenum) {
+    (void) framenum;
+    int address;
+    int x, y;
+    if (framenum & 1) address = 0x40020004;
+    else              address = 0x40020404;
+    for (y = 0; y < 14; y++) {
+        for (x = 0; x < 20; x++) {
+            if (x == cursor_x && y == cursor_y) *(uint16_t*)(address + (x<<1) + (y<<6)) = 0x7FFF;
+            else *(uint16_t*)(address + (x<<1) + (y<<6)) = 0x0000;
+        }
+    }
+    *(uint16_t*)(0x40020000) = address & 0x7FFF;
+}    
+    
 int main(void)
 {
     volatile uint32_t *ledpwm = LED_PWM_BASE;
@@ -60,25 +127,25 @@ int main(void)
     int toggle = 0;
     char ch = 'A';
     int i;
+    uint32_t address;
     int x, y;
     int count = 0;
     int success = 0;
-
+    int frame_countdown = 1000;
+    int frame_num = 0;
+    
     ledpwm[0] = 127;
     ledpwm[1] = 0;
     ledpwm[3] = 0;
     
+    cursor_x = 0;
+    cursor_y = 0;
+
     //for (i = 0; i < LED_PWM_COUNT; i++) {
     //    ledpwm[i] = val;
     //    val >>= 2;
     //}
 
-    for (y = 0; y < 14; y++) {
-        for (x = 0; x < 32; x++) {
-            *(uint16_t*)(0x40020004 + (x<<1) + (y<<6)) = x<<11 | y<<1;
-        }
-    }
-    *(uint16_t*)(0x40020000) = 4;
 
     ledpwm[0] = 0;
     ledpwm[1] = 1;
@@ -86,6 +153,11 @@ int main(void)
     
     /* And finally - the main loop. */
     while (1) {
+        if (frame_countdown-- == 0) {
+            frame_countdown = 1000;//40000;
+            update_frame_point(frame_num++);
+        }
+        
         /* If there are characters received, echo them back. */
         if (SERIAL->isr & 0x01) {
             uint8_t ch = SERIAL->rhr;
@@ -93,6 +165,13 @@ int main(void)
             toggle = (toggle == 0);
             count++;
 
+            if      (ch == 'a') cursor_x--;
+            else if (ch == 'd') cursor_x++;
+            else if (ch == 'w') cursor_y--;
+            else if (ch == 's') cursor_y++;
+            cursor_x &= 0x1F;
+            cursor_y &= 0x0F;
+                
             if (ch == 0x20) {
                 //*(uint8_t*)(0x10000008) = 0x5A;
                 //*(uint8_t*)(0x10000009) = 0x01;
@@ -118,13 +197,33 @@ int main(void)
                 //    printf("%08X\n\r", *(volatile uint32_t*)(0x10001000+(i<<2)));
                 //}
 
-                for (i = 0; i < 32; i++) {
-                    printf("%08X\n\r", *(volatile uint32_t*)(0x30000000+(i<<2)));
+                //// check button and audio
+                //printf("%08X ", *(volatile uint32_t*)(0x4000000C));
+                //printf("%08X\n\r", *(volatile uint32_t*)(0x40000010));
+
+                // read out frame
+
+                printf("\n\r1:\n\r");
+                address = 0x40020004;
+                for (y = 0; y < 14; y++) {
+                    for (x = 0; x < 20; x++) {
+                        printf("%04X ", *(volatile uint16_t*)(address + (x<<1) + (y<<6)));
+                    }
+                    printf("\n\r");
                 }
+                printf("2:\n\r");
+                address = 0x40020404;
+                for (y = 0; y < 14; y++) {
+                    for (x = 0; x < 20; x++) {
+                        printf("%04X ", *(volatile uint16_t*)(address + (x<<1) + (y<<6)));
+                    }
+                    printf("\n\r");
+                }
+                printf("led_matrix address: %04X\r\n", *(volatile uint16_t*)(0x40020000));
             }
             
-#if 1
-            if ((count % 64) == 0) {
+#if 0
+            if ((count % 16) == 0) {
                 printf("Hello World %d\n", count);
                 //for (i=0; i < 64; i++) {
                 //    *(uint16_t*)(0x50000100+(i<<1)) = i;
