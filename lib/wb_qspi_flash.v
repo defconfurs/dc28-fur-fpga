@@ -29,10 +29,9 @@ module wb_qspi_flash #(
     localparam XFER_STATE_IDLE    = 4'h0;
     localparam XFER_STATE_COMMAND = 4'h1;
     localparam XFER_STATE_ADDRESS = 4'h2;
-    localparam XFER_STATE_MODE    = 4'h3;
-    localparam XFER_STATE_DUMMY   = 4'h4;
-    localparam XFER_STATE_READ    = 4'h5;
-    localparam XFER_STATE_DONE    = 4'h6;
+    localparam XFER_STATE_DUMMY   = 4'h3;
+    localparam XFER_STATE_READ    = 4'h4;
+    localparam XFER_STATE_DONE    = 4'h5;
     
     localparam SPI_ADDR_BITS = 24;
     localparam WB_ADDR_BITS = SPI_ADDR_BITS-$clog2(DW/8);
@@ -81,23 +80,17 @@ module wb_qspi_flash #(
                     xfer_state <= XFER_STATE_COMMAND;
                     xfer_addr  <= wb_addr_local;
                     xfer_dir   <= 4'b0001;
-                    xfer_data  <= 32'h10111011; // 8'hEB with bit stuffing. - trying EC instead
+                    xfer_data  <= 32'h10111011; // 8'hEB with bit stuffing.
                     xfer_count <= 8;
                 end
             end
             XFER_STATE_COMMAND : begin
-                xfer_data[31:0] <= { xfer_addr }; // include "mode" bits
-                xfer_count <= 6;
+                xfer_data[31:0] <= { xfer_addr, 8'd0 }; // include "mode" bits
+                xfer_count <= 8;
                 xfer_dir   <= 4'b1111;
                 xfer_state <= XFER_STATE_ADDRESS;
             end
             XFER_STATE_ADDRESS : begin
-                xfer_data  <= 0; // mode
-                xfer_count <= 2; // 1 byte of mode
-                xfer_dir   <= 4'b1111;
-                xfer_state <= XFER_STATE_MODE;
-            end
-            XFER_STATE_MODE : begin
                 xfer_data  <= 0;
                 xfer_count <= 8; // latency defaults to 8
                 xfer_dir   <= 4'b0000;
