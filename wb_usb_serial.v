@@ -1,3 +1,5 @@
+`default_nettype none
+
 module wb_usb_serial#(
 	parameter	AW = 32,
     parameter   DW = 32,
@@ -78,40 +80,19 @@ always @(posedge wb_clk_i) begin
     end
 end
 
-// Local register addresses - stolen from the ubiquitous NS16650
 localparam REG_USART_RHR = 8'h00;   // Receive Holding Register
 localparam REG_USART_THR = 8'h00;   // Transmit Holding Register
 localparam REG_USART_IER = 8'h01;   // Interrupt Enable Register
 localparam REG_USART_ISR = 8'h02;   // Interrupt Status Register
-localparam REG_USART_FCR = 8'h02;   // FIFO Control Register
-localparam REG_USART_LCR = 8'h03;   // Line Control Register
-localparam REG_USART_MCR = 8'h04;   // Modem Control Register
-localparam REG_USART_LSR = 8'h05;   // Line Status Register
-localparam REG_USART_MSR = 8'h06;   // Modem Status Register
-localparam REG_USART_SCRATCH = 8'h07;
-// Extra registers, accessible when DLAB=1
-localparam REG_USART_DLL = 8'h10;
-localparam REG_USART_DLM = 8'h11;
-localparam REG_USART_PLD = 8'h15;
 
 reg [7:0] r_int_enable = 8'h00;
 wire [7:0] r_int_status = {6'b000000, ~uart_in_valid, uart_out_valid};
-reg [7:0] r_fifo_ctrl = 8'h00;
-reg [7:0] r_line_ctrl = 8'h00;
-reg [7:0] r_modem_ctrl = 8'h00;
-reg [7:0] r_line_status = 8'h00;
-reg [7:0] r_modem_status = 8'h00;
-reg [7:0] r_scratch = 8'h00;
-reg [15:0] r_divisor = 16'h00;
-reg [7:0] r_prescaler = 8'h00;
-wire r_lcr_dlab;
-assign r_lcr_dlab = r_line_ctrl[7];
 
 // Wishbone Glue
 wire stb_valid;
-wire [4:0] r_addr;
+wire [3:0] r_addr;
+assign r_addr = wb_adr_i[3:0];
 assign stb_valid = wb_cyc_i && wb_stb_i && !wb_ack_o;
-assign r_addr = {r_lcr_dlab, wb_adr_i[3:0]};
 assign uart_out_get = (stb_valid && ~wb_we_i) && (r_addr == REG_USART_RHR);
 assign wb_txfifo_write_strobe = (stb_valid && wb_we_i) && (r_addr == REG_USART_THR);
 
@@ -124,14 +105,6 @@ always @(posedge wb_clk_i) begin
         REG_USART_RHR : wb_dat_o <= {wb_dat_nop, uart_out_data};
         REG_USART_IER : wb_dat_o <= {wb_dat_nop, r_int_enable};
         REG_USART_ISR : wb_dat_o <= {wb_dat_nop, r_int_status};
-        REG_USART_LCR : wb_dat_o <= {wb_dat_nop, r_line_ctrl};
-        REG_USART_MCR : wb_dat_o <= {wb_dat_nop, r_modem_ctrl};
-        REG_USART_LSR : wb_dat_o <= {wb_dat_nop, r_line_status};
-        REG_USART_MSR : wb_dat_o <= {wb_dat_nop, r_modem_status};
-        REG_USART_SCRATCH : wb_dat_o <= {wb_dat_nop, r_scratch};
-        REG_USART_DLL : wb_dat_o <= {wb_dat_nop, r_divisor[7:0]};
-        REG_USART_DLM : wb_dat_o <= {wb_dat_nop, r_divisor[15:8]};
-        REG_USART_PLD : wb_dat_o <= {wb_dat_nop, r_prescaler};
         default :       wb_dat_o <= 0;
     endcase
 end
@@ -141,13 +114,6 @@ always @(posedge wb_clk_i) begin
     if (stb_valid && wb_we_i && wb_sel_i[0]) case (r_addr)
         REG_USART_THR : uart_in_data <= wb_dat_i[7:0];
         REG_USART_IER : r_int_enable <= wb_dat_i[7:0];
-        REG_USART_FCR : r_fifo_ctrl  <= wb_dat_i[7:0];
-        REG_USART_LCR : r_line_ctrl  <= wb_dat_i[7:0];
-        REG_USART_MCR : r_modem_ctrl <= wb_dat_i[7:0];
-        REG_USART_SCRATCH : r_scratch   <= wb_dat_i[7:0];
-        REG_USART_DLL : r_divisor[7:0]  <= wb_dat_i[7:0];
-        REG_USART_DLM : r_divisor[15:8] <= wb_dat_i[7:0];
-        REG_USART_PLD : r_prescaler     <= wb_dat_i[7:0];
     endcase
 end
 
