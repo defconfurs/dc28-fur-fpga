@@ -77,15 +77,12 @@ module pdm_mic #(
     end
     
     always @(posedge clk or posedge rst) begin
-      if (rst) begin
-        audio1 <= 0;
-      end
-      else begin
-        audio_valid <= div_sample;
-        if (div_sample) begin
-          audio1 <= sample1_out;
+        if (rst) begin
+            audio1 <= 0;
         end
-      end
+        else begin
+            audio1 <= sample1_out;
+        end
     end
   
 endmodule

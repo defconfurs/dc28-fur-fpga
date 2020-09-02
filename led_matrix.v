@@ -215,11 +215,11 @@ module led_matrix #(
 
   wire [4:0] xpos;
   wire [3:0] ypos;
-  assign xpos = { current_col, pixel_being_updated[0] ^ pixel_being_updated[1] };
+  assign xpos = { current_col, pixel_being_updated[0] };
   assign ypos = { pixel_being_updated[4:1] };
 
   assign ram_address = (latched_frame_address + 
-                        { ypos[3:0], xpos[4:0] });
+                        ({ ypos[3:0], xpos[4:1], xpos[0]^ypos[0] }));
 
 
   //==============================
