@@ -218,28 +218,28 @@ int main(void)
                 //    printf("%08X\n\r", *(volatile uint32_t*)(0x10001000+(i<<2)));
                 //}
 
-                //// check button and audio
-                //printf("%08X ", *(volatile uint32_t*)(0x4000000C));
-                //printf("%08X\n\r", *(volatile uint32_t*)(0x40000010));
+                // check button and audio
+                printf("%08X ", *(volatile uint32_t*)(0x4000000C));
+                printf("%08X\n\r", *(volatile uint32_t*)(0x40000010));
 
-                // read out frame
-                printf("\n\r1:\n\r");
-                address = 0x40020004;
-                for (y = 0; y < 14; y++) {
-                    for (x = 0; x < 20; x++) {
-                        printf("%04X ", *(volatile uint16_t*)(address + (x<<1) + (y<<6)));
-                    }
-                    printf("\n\r");
-                }
-                printf("2:\n\r");
-                address = 0x40020404;
-                for (y = 0; y < 14; y++) {
-                    for (x = 0; x < 20; x++) {
-                        printf("%04X ", *(volatile uint16_t*)(address + (x<<1) + (y<<6)));
-                    }
-                    printf("\n\r");
-                }
-                printf("led_matrix address: %04X\r\n", *(volatile uint16_t*)(0x40020000));
+                //// read out frame
+                //printf("\n\r1:\n\r");
+                //address = 0x40020004;
+                //for (y = 0; y < 14; y++) {
+                //    for (x = 0; x < 20; x++) {
+                //        printf("%04X ", *(volatile uint16_t*)(address + (x<<1) + (y<<6)));
+                //    }
+                //    printf("\n\r");
+                //}
+                //printf("2:\n\r");
+                //address = 0x40020404;
+                //for (y = 0; y < 14; y++) {
+                //    for (x = 0; x < 20; x++) {
+                //        printf("%04X ", *(volatile uint16_t*)(address + (x<<1) + (y<<6)));
+                //    }
+                //    printf("\n\r");
+                //}
+                //printf("led_matrix address: %04X\r\n", *(volatile uint16_t*)(0x40020000));
 
                 // read out flash region
                 i = 0;

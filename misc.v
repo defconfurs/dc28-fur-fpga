@@ -36,14 +36,13 @@ module wb_misc #(
 
     // Register Read
     always @(posedge wb_clk_i) begin
-        if (wb_reset_i) wb_dat_o <= {(DW){1'b0}};
-        else if (stb_edge && ~wb_we_i) begin
+        if (stb_edge && ~wb_we_i) begin
             case (reg_addr)
             0: wb_dat_o       <= { {(DW-8){1'b0}}, reg_intensity[0] };
             1: wb_dat_o       <= { {(DW-8){1'b0}}, reg_intensity[1] };
             2: wb_dat_o       <= { {(DW-8){1'b0}}, reg_intensity[2] };
             3: wb_dat_o       <= { {(DW-2){1'b0}}, buttons };
-            4: wb_dat_o       <= { {(DW-12){1'b0}}, audio };
+            4: wb_dat_o       <= { {(DW-12){audio[11]}}, audio };
             default: wb_dat_o <= 0;
             endcase
         end

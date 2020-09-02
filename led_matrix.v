@@ -121,8 +121,7 @@ module led_matrix #(
   localparam TOTAL_LOAD_TIME    = 2 * N_COLS / 2;
   localparam TOTAL_LINE_TIME    = 'h400; // don't forget to update for the maximum PWM time
 
-  localparam TOTAL_LOAD_TIME_SIZE = $clog2(TOTAL_LOAD_TIME+1);
-  localparam TOTAL_LINE_TIME_SIZE = $clog2(TOTAL_LINE_TIME+1);
+  localparam TOTAL_LOAD_TIME_SIZE = TOTAL_LOAD_TIME > TOTAL_LINE_TIME ? $clog2(TOTAL_LOAD_TIME+1) : $clog2(TOTAL_LINE_TIME+1);
 
   localparam COL_STEP =  1*2;
   localparam ROW_STEP = 32*2;
@@ -141,6 +140,15 @@ module led_matrix #(
 
 
 
+    localparam LOAD_STATE_START_REQUEST     = 6'b000001;
+    localparam LOAD_STATE_REQUEST_DELAY     = 6'b000010;
+    localparam LOAD_STATE_COMPLETE_REQUEST  = 6'b000100;
+    localparam LOAD_STATE_GET_VALUE         = 6'b001000;
+    localparam LOAD_STATE_LOAD_WAIT         = 6'b010000;
+    localparam LOAD_STATE_DISPLAY           = 6'b100000;
+    reg [5:0] load_state = LOAD_STATE_START_REQUEST;
+    
+    
 
   //===========================================================================================
   // Pixel Reader
@@ -168,7 +176,6 @@ module led_matrix #(
   reg [N_COLS_SIZE-1:0]        current_col = 0;
   
 
-  reg [TOTAL_LINE_TIME_SIZE-1:0]   col_timer = 0;
   reg [TOTAL_LOAD_TIME_SIZE-1:0]   load_timer = 0;
 
   //===========================================================================================
@@ -188,7 +195,7 @@ module led_matrix #(
   end
   
   always @(posedge clk) begin
-    if (col_timer) begin
+    if (load_state == LOAD_STATE_DISPLAY) begin
       if (pwm_pos_timer) pwm_pos_timer <= pwm_pos_timer - 1;
       else if (pwm_pos < 63) begin
         pwm_pos <= pwm_pos + 1;
@@ -206,13 +213,6 @@ module led_matrix #(
   // The matrix display
   
 
-  localparam LOAD_STATE_START_REQUEST     = 5'b00001;
-  localparam LOAD_STATE_REQUEST_DELAY     = 5'b00010;
-  localparam LOAD_STATE_COMPLETE_REQUEST  = 5'b00100;
-  localparam LOAD_STATE_GET_VALUE         = 5'b01000;
-  localparam LOAD_STATE_LOAD_WAIT         = 5'b10000;
-  reg [4:0] load_state = LOAD_STATE_START_REQUEST;
-
   wire [4:0] xpos;
   wire [3:0] ypos;
   assign xpos = { current_col, pixel_being_updated[0] };
@@ -225,7 +225,7 @@ module led_matrix #(
   //==============================
   // PWM engine
   reg [5:0]  latched_pixels[0:(N_ROWS<<1)-1];
-  wire       col_timer_active = |col_timer;
+  wire       col_timer_active = load_state == LOAD_STATE_DISPLAY;
   reg        last_col_timer_active;
   integer pix_i;
   always @(posedge clk) begin
@@ -236,7 +236,7 @@ module led_matrix #(
         if (latched_pixels[pix_i] != 0) led_out_state[pix_i] <= 1;
       end
     end
-    else if (col_timer) begin
+    else if (col_timer_active) begin
       for (pix_i = 0; pix_i < N_ROWS<<1; pix_i = pix_i+1) begin
         if (latched_pixels[pix_i] == pwm_pos) led_out_state[pix_i] <= 0;
       end
@@ -253,27 +253,17 @@ module led_matrix #(
   integer i;
   always @(posedge clk or posedge rst) begin
     if (rst) begin
-      ram_ready             <= 1;
-      col_timer             <= TOTAL_LINE_TIME;
-      load_state            <= LOAD_STATE_START_REQUEST;
-      current_field         <= FIELD_BLUE;
-      current_col           <= 0;
-      pixel_being_updated   <= 0;
-      latched_frame_address <= 0;
-      for (i = 0; i < N_ROWS<<1; i = i+1) latched_pixels[i] <= 0;
+        ram_ready             <= 1;
+        load_state            <= LOAD_STATE_START_REQUEST;
+        current_field         <= FIELD_BLUE;
+        current_col           <= 0;
+        pixel_being_updated   <= 0;
+        latched_frame_address <= 0;
+        for (i = 0; i < N_ROWS<<1; i = i+1) latched_pixels[i] <= 0;
     end
     
     else begin
-      if (col_timer) begin
-          col_timer      <= col_timer - 1;
-        
-          load_timer     <= TOTAL_LOAD_TIME;
-          ram_ready      <= 1;
-          frame_complete <= 1;
-      end
-      else begin // new col
         if (load_timer) load_timer <= load_timer -1;
-        frame_complete <= 0;
         
         case (load_state)
         LOAD_STATE_START_REQUEST: begin
@@ -285,67 +275,79 @@ module led_matrix #(
         end
         
         LOAD_STATE_REQUEST_DELAY: begin
-            ram_ready  <= 0;
-            load_state <= LOAD_STATE_COMPLETE_REQUEST;
+            frame_complete <= 0;
+            ram_ready      <= 0;
+            load_state     <= LOAD_STATE_COMPLETE_REQUEST;
         end
         
         LOAD_STATE_COMPLETE_REQUEST: begin
-          ram_ready  <= 0;
-          load_state <= LOAD_STATE_GET_VALUE;
+            frame_complete <= 0;
+            ram_ready      <= 0;
+            load_state     <= LOAD_STATE_GET_VALUE;
         end
         
         LOAD_STATE_GET_VALUE: begin
-          ram_ready  <= 1;
-          
-          for (i = 0; i < N_ROWS<<1; i = i+1) begin
-            if (i == pixel_being_updated) begin
-              latched_pixels[i] <= pixel_out;
+            frame_complete <= 0;
+            ram_ready      <= 1;
+            
+            for (i = 0; i < N_ROWS<<1; i = i+1) begin
+                if (i == pixel_being_updated) begin
+                    latched_pixels[i] <= pixel_out;
+                end
             end
-          end
           
-          if (pixel_being_updated < N_ROWS<<1) begin
-            pixel_being_updated <= pixel_being_updated + 1;
-
-            load_state          <= LOAD_STATE_START_REQUEST;
-          end
-          else begin
-            pixel_being_updated <= 0;
-            
-            case(current_field)
-            FIELD_BLUE:  begin  current_field <= FIELD_GREEN;  end
-            FIELD_GREEN: begin  current_field <= FIELD_RED;    end
-            FIELD_RED:   begin  current_field <= FIELD_BLUE;   end
-            default:     begin  current_field <= FIELD_BLUE;   end
-            endcase
-            
-            load_state <= LOAD_STATE_LOAD_WAIT;
-          end
+            if (pixel_being_updated < N_ROWS<<1) begin
+                pixel_being_updated <= pixel_being_updated + 1;
+                
+                load_state          <= LOAD_STATE_START_REQUEST;
+            end
+            else begin
+                pixel_being_updated <= 0;
+                
+                case(current_field)
+                FIELD_BLUE:  begin  current_field <= FIELD_GREEN;  end
+                FIELD_GREEN: begin  current_field <= FIELD_RED;    end
+                FIELD_RED:   begin  current_field <= FIELD_BLUE;   end
+                default:     begin  current_field <= FIELD_BLUE;   end
+                endcase
+                
+                load_state <= LOAD_STATE_LOAD_WAIT;
+            end
         end
         
         LOAD_STATE_LOAD_WAIT: begin
-          ram_ready  <= 1;
+            ram_ready      <= 1;
+            frame_complete <= 0;
 
-          if (!load_timer) begin
-            load_state <= LOAD_STATE_START_REQUEST;
-            load_timer <= TOTAL_LOAD_TIME;
-            col_timer  <= TOTAL_LINE_TIME;
+            if (!load_timer) begin
+                load_state <= LOAD_STATE_DISPLAY;
+                load_timer <= TOTAL_LINE_TIME;
             
-            if (current_field == FIELD_BLUE) begin
-              if (current_col < N_COLS-1) begin
-                current_col <= current_col + 1;
-              end
-              else begin
-                current_col           <= 0;
-                latched_frame_address <= frame_address;
-                frame_complete        <= 1;
-              end
+                if (current_field == FIELD_BLUE) begin
+                    if (current_col < N_COLS-1) begin
+                        current_col <= current_col + 1;
+                    end
+                    else begin
+                        current_col           <= 0;
+                        latched_frame_address <= frame_address;
+                        frame_complete        <= 1;
+                    end
+                end
             end
-          end
+        end
+
+        LOAD_STATE_DISPLAY: begin
+            ram_ready      <= 1;
+            frame_complete <= 1;
+
+            if (load_timer == 0) begin
+                load_state <= LOAD_STATE_START_REQUEST;
+                load_timer <= TOTAL_LOAD_TIME;
+            end
         end
         
         endcase
       end
-    end
   end
 
   localparam SHIFT_CLOCK_COUNTER_SIZE = $clog2(SHIFT_CLOCK_PERIOD+1);
