@@ -10,7 +10,7 @@ libdir = os.path.join(srcdir, "lib")
 firmwaredir = os.path.join(srcdir, "firmware")
 ldsfile = os.path.join(firmwaredir,'firmware.lds')
 
-CFLAGS = ['-v','-Os', '-march=rv32ic', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
+CFLAGS = ['-Os', '-march=rv32ic', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
 CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_FLOAT=1', '-DPRINTF_DISABLE_SUPPORT_EXPONENTIAL=1']
 CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_LONG_LONG=1', '-DPRINTF_DISABLE_SUPPORT_PTRDIFF_T=1']
 LDFLAGS = CFLAGS + ['-Wl,-Bstatic,-T,'+ldsfile+',--gc-sections']
@@ -218,12 +218,14 @@ def build_rom(*args, name='firmware'):
         outfile = os.path.splitext(infile)[0] + '.o'
         objfiles += [outfile]
         
+        print("   Compiling  [" + infile + "]")
         if call([gcc] + CFLAGS + ['-c', '-o', outfile, infile]) != 0:
             print("---- Error compiling ----")
             return
 
     #$(CROSS_COMPILE)gcc $(LDFLAGS) -o $@ $^
     elffile = os.path.join(firmwaredir, name + '.elf')
+    print("   Linking    [" + elffile + "]")
     if call([gcc] + LDFLAGS + ['-o', elffile] + objfiles) != 0:
         print("---- Error compiling ----")
         return
@@ -231,6 +233,7 @@ def build_rom(*args, name='firmware'):
     #%.bin: %.elf
     #   $(CROSS_COMPILE)objcopy -O binary $^ $@
     binfile = os.path.join(firmwaredir, name + '.bin')
+    print("   Generating [" + binfile + "]")
     if call([objcopy, '-O', 'binary', elffile, binfile]) != 0:
         return
 

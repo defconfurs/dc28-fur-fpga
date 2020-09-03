@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 #include <printf.h>
 #include <string.h>
 
@@ -11,49 +12,23 @@ struct serial_regmap {
     union {
         serial_reg_t thr;   // Transmit Holding Register.
         serial_reg_t rhr;   // Receive Holding Register.
-        serial_reg_t dll;   // Baudrate Divisor LSB 
     };
-    union {
-        serial_reg_t ier;   // Interrupt Enable Register.
-        serial_reg_t dlm;   // Baudrate Divisor MSB
-    };
-    union {
-        serial_reg_t isr;   // Interrupt Status Register.
-        serial_reg_t fcr;   // FIFO Configuration Register.
-        serial_reg_t pld;   // Prescaler Divider.
-    };
-    serial_reg_t    lcr;    // Line Control Register.
-    serial_reg_t    mcr;    // Modem Control Register.
-    serial_reg_t    lsr;    // Line Status Register.
-    serial_reg_t    msr;    // Modem Status Register.
-    serial_reg_t    scratch; // Scratch Value Register.
+    serial_reg_t ier;   // Interrupt Enable Register.
+    serial_reg_t isr;   // Interrupt Status Register.
 } __attribute__((packed));
 #define SERIAL ((volatile struct serial_regmap *)0x40010000)
 
-static void serial_putc(int ch)
-{
-    while ((SERIAL->isr & 0x02) == 0) { /* nop */}
-    SERIAL->thr = ch;
-}
-
 void _putchar(char ch)
 {
+    /* Cook line endings to play nicely with terminals. */
+    static char prev = '\0';
+    if ((ch == '\n') && (prev != '\r')) _putchar('\r');
+    prev = ch;
+
+    /* Output the character */
     while ((SERIAL->isr & 0x02) == 0) { /* nop */}
     SERIAL->thr = ch;
 }
-
-static void serial_puthex(int value)
-{
-    int nibble = value & 0xF;
-    if (value >= 16) {
-        serial_puthex(value >> 4);
-    } else {
-        serial_putc('0');
-        serial_putc('x');
-    }
-    serial_putc(nibble >= 10 ? ('A'+nibble-10) : ('0'+nibble));
-}
-
 
 //
 //    static const uint32_t bitmap[] = {
@@ -165,6 +140,23 @@ static void update_frame_audio(int average, int peak) {
     else                   address += 0x400*23; // 9
     
     *(uint16_t*)(0x40020000) = address & 0x7FFF;
+}    
+
+static void bootload(int slot)
+{
+    const uintptr_t bootsz = 64 * 1024;
+    uintptr_t target = 0x20000000;
+    uintptr_t userdata = 0x30000000 + (1024 * 1024);    /* User data starts 1MB into flash. */
+    uintptr_t animation = userdata + (slot * bootsz);   /* Animations are spaced 64kB apart. */
+
+    /* Copy the animation into RAM. */
+    memcpy((void *)target, (void *)animation, bootsz);
+    
+    /* Execute it */
+    asm volatile(
+        "jalr %[target] \n" /* Jump to the target address */
+        "j _entry       \n" /* If we happen to return - reboot */
+        :: [target]"r"(target));
 }
 
 int main(void)
@@ -234,7 +226,14 @@ int main(void)
             else if (ch == 's') cursor_y++;
             cursor_x &= 0x1F;
             cursor_y &= 0x0F;
-                
+
+            _putchar(ch);
+
+            if (ch == 'b') {
+                /* Bootload the animation in slot 0. */
+                bootload(0);
+            }
+
             if (ch == 0x20) {
                 //*(uint8_t*)(0x10000008) = 0x5A;
                 //*(uint8_t*)(0x10000009) = 0x01;
@@ -295,22 +294,6 @@ int main(void)
                 //    printf("\n\r");
                 //}
             }
-            
-#if 0
-            if ((count % 16) == 0) {
-                printf("Hello World %d\n", count);
-                //for (i=0; i < 64; i++) {
-                //    *(uint16_t*)(0x50000100+(i<<1)) = i;
-                //}
-                //for (i=0; i < 32; i++) {
-                //    printf("%08X\n\r", *(volatile uint32_t*)(0x50000100+i<<2));
-                //}
-                //if (success) printf("Mem check passed\n\r");
-                //else         printf("Mem check failed\n\r");
-            }
-#else
-            serial_putc(ch);
-#endif
         }
     }
 }

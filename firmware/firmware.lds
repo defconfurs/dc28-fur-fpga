@@ -4,13 +4,14 @@ MEMORY
     SRAM (rwx) : ORIGIN = 0x10000000, LENGTH = 4096
 }
 
-ENTRY(start)
+ENTRY(_entry)
 
 SECTIONS
 {
     /* Place program code directly into ROM */
     .text : {
         . = ALIGN(4);
+        *(.entry)           /* boot entry point */
         *(.text)            /* .text sections (code) */
         *(.text*)           /* .text sections (code) */
         *(.rodata)          /* .rodata sections (constants, strings, etc) */

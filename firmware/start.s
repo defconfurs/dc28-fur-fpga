@@ -1,5 +1,3 @@
-.section .text
-
 # Global symbols from the linker file.
 .global _etext
 .global _sidata
@@ -11,11 +9,29 @@
 .global _stack_start
 .global main
 .global start
+.global printf_
+.global vprintf_
 
-start:
+.section .entry
+
+# Boot entry point is at address zero.
+.globl _entry
+.type _entry,@function
+_entry:
+    la x2, _stack_start
+    j setup_crt
+
+# BIOS function vtable is at address 0x10.
+.balign 16
+.globl _bios_vtable
+.type _bios_vtable,@object
+_bios_vtable:
+    .word printf_
+    .word vprintf_
+
+setup_crt:
     # initialize the register file
     addi x1, zero, 0
-    la x2, _stack_start
     addi x3, zero, 0
     addi x4, zero, 0
     addi x5, zero, 0
