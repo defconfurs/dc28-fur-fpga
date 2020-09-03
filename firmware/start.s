@@ -9,6 +9,7 @@
 .global _stack_start
 .global main
 .global start
+.global bootload
 .global printf_
 .global vprintf_
 
@@ -26,6 +27,7 @@ _entry:
 .globl _bios_vtable
 .type _bios_vtable,@object
 _bios_vtable:
+    .word bootload
     .word printf_
     .word vprintf_
 

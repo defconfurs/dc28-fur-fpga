@@ -142,7 +142,7 @@ static void update_frame_audio(int average, int peak) {
     *(uint16_t*)(0x40020000) = address & 0x7FFF;
 }    
 
-static void bootload(int slot)
+void bootload(int slot)
 {
     const uintptr_t bootsz = 64 * 1024;
     uintptr_t target = 0x20000000;
