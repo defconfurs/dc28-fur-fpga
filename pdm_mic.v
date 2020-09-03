@@ -1,8 +1,5 @@
 module pdm_mic #(
-      parameter SAMPLE_DEPTH      = 16,
-      parameter FIR_SAMPLE_LENGTH = 512,
-      parameter INPUT_FREQUENCY   = 12000000,
-      parameter FREQUENCY         = 400000
+      parameter SAMPLE_DEPTH      = 16
 ) (
       input wire                           clk,
       input wire                           rst,
@@ -35,24 +32,24 @@ module pdm_mic #(
 
     reg signed [SAMPLE_DEPTH-1:0] sample1_out;
 
-    reg [8:0] w_address; // length == 512
+    reg [10:0] w_address; // length == 2048
     wire      buf_out;
     
     SB_RAM40_4K #(
         .WRITE_MODE ( 3 ), // 2048x2
         .READ_MODE  ( 3 )  // 2048x2
     ) fir_buffer_inst (
-        .RCLK ( clk       ),
-        .RCLKE( 1         ),
-        .RE   ( 1         ),
-        .RADDR( w_address ),
-        .RDATA( buf_out   ),
-        .WCLK ( clk       ),
-        .WCLKE( 1         ),
-        .WE   ( 1         ),
-        .WADDR( w_address ),
-        .MASK ( 2'b11     ),
-        .WDATA( {1'b1, mic1_in} )
+        .RCLK  ( clk       ),
+        .RCLKE ( 1         ),
+        .RE    ( 1         ),
+        .RADDR ( w_address ),
+        .RDATA ( buf_out   ),
+        .WCLK  ( clk       ),
+        .WCLKE ( 1         ),
+        .WE    ( 1         ),
+        .WADDR ( w_address ),
+        .MASK  ( 2'b11     ),
+        .WDATA ( {15'd0, mic1_in} )
     );
 
     always @(posedge clk or posedge rst) begin

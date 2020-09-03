@@ -243,7 +243,7 @@ int main(void)
 
                 // read out flash region
                 i = 0;
-                for (y = 0; y < 4; y++) {
+                for (y = 0; y < 8; y++) {
                     for (x = 0; x < 8; x++) {
                         printf("%08X ", *(volatile uint32_t*)(0x30000000+i));
                         i+=4;

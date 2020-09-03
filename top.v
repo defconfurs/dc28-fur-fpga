@@ -107,6 +107,10 @@ module top (
   
     assign pin_r3a         = row_data[6];
     assign pin_r3b         = row_data[7];
+
+    assign pin_iob_9b  = 0;
+    assign pin_iob_8a  = 0;
+    assign pin_iob_13b = 0;
   
   
     wire flash_busy;
@@ -151,14 +155,10 @@ module top (
       end
     end
   
-    reg  clk_24mhz     = 0;
-    always @(posedge clk_48mhz) clk_24mhz <= ~clk_24mhz;
-    
+    reg  clk_24mhz = 0;
     reg  clk_12mhz = 0;
+    always @(posedge clk_48mhz) clk_24mhz <= ~clk_24mhz;
     always @(posedge clk_24mhz) clk_12mhz <= ~clk_12mhz;
-  
-    reg  clk_6mhz = 0;
-    always @(posedge clk_12mhz) clk_6mhz <= ~clk_6mhz;
     
     wire clk;
     wire rst;
@@ -166,9 +166,6 @@ module top (
     assign clk = clk_12mhz;
     assign rst = reset;
   
-    assign pin_iob_9b = 0;//clk_48mhz;
-    assign pin_iob_8a = 0;//clk;
-    assign pin_iob_13b = 0;//rst;
   
     localparam XBAR_ADDR_WIDTH = 4;
     localparam SELECTOR_ADDR_WIDTH = 4;
@@ -658,10 +655,7 @@ module top (
     // Audio
   
     pdm_mic #(
-      .SAMPLE_DEPTH      ( 12 ),
-      .FIR_SAMPLE_LENGTH ( 8192 ),
-      .INPUT_FREQUENCY   ( CLK_FREQ ),
-      .FREQUENCY         (  2000000 )
+      .SAMPLE_DEPTH      ( 12 )
     ) mic_inst (
       .clk ( clk ),
       .rst ( rst ),
