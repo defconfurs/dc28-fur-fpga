@@ -17,7 +17,7 @@ module wb_misc #(
       // Controllable LEDs.
       output [2:0]        leds,
       input [1:0]         buttons,
-      input [11:0]        audio
+      input signed [15:0] audio
     );
 
     // Only use the LSB nibble for address decoding.
@@ -42,7 +42,7 @@ module wb_misc #(
             1: wb_dat_o       <= { {(DW-8){1'b0}}, reg_intensity[1] };
             2: wb_dat_o       <= { {(DW-8){1'b0}}, reg_intensity[2] };
             3: wb_dat_o       <= { {(DW-2){1'b0}}, buttons };
-            4: wb_dat_o       <= { {(DW-12){audio[11]}}, audio };
+            4: wb_dat_o       <= { {(DW-16){audio[15]}}, audio };
             default: wb_dat_o <= 0;
             endcase
         end

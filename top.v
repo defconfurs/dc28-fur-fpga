@@ -496,7 +496,7 @@ module top (
     //---------------------------------------------------------------
     // wishbone connected LED PWM driver
     wire [1:0] buttons;
-    wire [11:0] audio;
+    wire signed [15:0] audio;
 
     assign buttons = { pin_button_up, pin_button_down };
     
@@ -655,7 +655,7 @@ module top (
     // Audio
   
     pdm_mic #(
-      .SAMPLE_DEPTH      ( 12 )
+      .SAMPLE_DEPTH      ( 16 )
     ) mic_inst (
       .clk ( clk ),
       .rst ( rst ),

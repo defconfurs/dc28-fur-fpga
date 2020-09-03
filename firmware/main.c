@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <printf.h>
+#include <string.h>
 
 #define LED_PWM_BASE    (volatile uint32_t *)0x40000000
 #define LED_PWM_COUNT   4
@@ -139,8 +140,33 @@ static void update_frame_point(int framenum) {
         }
     }
     *(uint16_t*)(0x40020000) = address & 0x7FFF;
-}    
+}
+
+static void update_frame_test_out(int framenum) {
+    int address;
+    int x, y;
+    address = 0x40020004 + 0x80 + ((framenum % 14) * 0x400);
+    *(uint16_t*)(0x40020000) = address & 0x7FFF;
+}
+
+static void update_frame_audio(int average, int peak) {
+    (void) average;
+    int address;
+    address = 0x40020084;
+    if      (peak <   80 ) address += 0x400*15; // 0
+    else if (peak <  200 ) address += 0x400*16; // 1
+    else if (peak <  500 ) address += 0x400*17; // 2
+    else if (peak <  800 ) address += 0x400*18; // 3
+    else if (peak < 1100 ) address += 0x400*19; // 4
+    else if (peak < 1500 ) address += 0x400*20; // 5
+    else if (peak < 1900 ) address += 0x400*21; // 6
+    else if (peak < 2200 ) address += 0x400*22; // 7
+    else if (peak < 2800 ) address += 0x400*23; // 8
+    else                   address += 0x400*23; // 9
     
+    *(uint16_t*)(0x40020000) = address & 0x7FFF;
+}
+
 int main(void)
 {
     volatile uint32_t *ledpwm = LED_PWM_BASE;
@@ -154,6 +180,10 @@ int main(void)
     int success = 0;
     int frame_countdown = 1000;
     int frame_num = 0;
+    int peak;
+    int audio_abs;
+    int audio_average;
+    int long_average;
     
     ledpwm[0] = 127;
     ledpwm[1] = 0;
@@ -167,6 +197,10 @@ int main(void)
     //    val >>= 2;
     //}
 
+    memcpy((uint32_t*)(0x40020004), (uint32_t*)(0x30100000), 0xFFF0);
+    //for (i = 0; i < 0x3C00; i += 4) {
+    //    *(uint32_t*)(0x40020004 + i) = *(uint32_t*)(0x30100004 + i);
+    //}
 
     ledpwm[0] = 0;
     ledpwm[1] = 1;
@@ -174,9 +208,17 @@ int main(void)
     
     /* And finally - the main loop. */
     while (1) {
+        audio_average = audio_average - (audio_average>>4) + *(int32_t*)(0x40000010);
+        long_average = long_average - (long_average>>8) + audio_average;
+        audio_abs = audio_average - (long_average>>8);
+        if (audio_abs < 0) audio_abs = -audio_abs;
+
+        if (peak > 1) peak--;
+        if (audio_abs > peak) peak = audio_abs;
+        
         if (frame_countdown-- == 0) {
             frame_countdown = 20000;
-            update_frame(frame_num++);
+            update_frame_audio(audio_abs, peak);
         }
         
         /* If there are characters received, echo them back. */
@@ -218,10 +260,12 @@ int main(void)
                 //    printf("%08X\n\r", *(volatile uint32_t*)(0x10001000+(i<<2)));
                 //}
 
-                // check button and audio
-                printf("%08X ", *(volatile uint32_t*)(0x4000000C));
-                printf("%08X\n\r", *(volatile uint32_t*)(0x40000010));
+                //// check button and audio
+                //printf("%08X ", *(volatile uint32_t*)(0x4000000C));
+                //printf("%08X\n\r", *(volatile uint32_t*)(0x40000010));
 
+                printf("%d - %d\n\r", audio_abs, peak);
+                
                 //// read out frame
                 //printf("\n\r1:\n\r");
                 //address = 0x40020004;
@@ -241,15 +285,15 @@ int main(void)
                 //}
                 //printf("led_matrix address: %04X\r\n", *(volatile uint16_t*)(0x40020000));
 
-                // read out flash region
-                i = 0;
-                for (y = 0; y < 8; y++) {
-                    for (x = 0; x < 8; x++) {
-                        printf("%08X ", *(volatile uint32_t*)(0x30000000+i));
-                        i+=4;
-                    }
-                    printf("\n\r");
-                }
+                //// read out flash region
+                //i = 0;
+                //for (y = 0; y < 8; y++) {
+                //    for (x = 0; x < 8; x++) {
+                //        printf("%08X ", *(volatile uint32_t*)(0x30100000+i));
+                //        i+=4;
+                //    }
+                //    printf("\n\r");
+                //}
             }
             
 #if 0
