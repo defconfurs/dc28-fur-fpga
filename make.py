@@ -175,7 +175,7 @@ def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48'):
         return
     if call([nextpnr_ice40, device, '--package', package, '--opt-timing', '--pcf', pcf, '--json', name+'.json', '--asc', name+'.asc']) != 0:
         return
-    if call([icepack, name+'.asc', name+'.bin']) != 0:
+    if call([icepack, '-s', name+'.asc', name+'.bin']) != 0:
         return
 
 #######################################
