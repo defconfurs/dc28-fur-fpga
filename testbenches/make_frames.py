@@ -27,7 +27,7 @@ def save_bin(frames, filename):
         
         header = bytearray(128)
         index = 0
-        
+
         for transition in item["transitions"].keys():
             if transition in reason_map.keys():
                 code      = reason_map[transition]

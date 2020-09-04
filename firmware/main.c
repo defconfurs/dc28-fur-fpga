@@ -57,18 +57,24 @@ void bootload(int slot)
     uintptr_t userdata = 0x30000000 + (1024 * 1024);    /* User data starts 1MB into flash. */
     uintptr_t animation = userdata + (slot * bootsz);   /* Animations are spaced 64kB apart. */
 
+    //printf("about to copy data\n\r");
     /* Copy the animation into RAM. */
     memcpy((void *)target, (void *)animation, bootsz);
+    //printf("copy done\n\r");
 
     while (*(uint32_t*)target == 0xFFFFFFFF) {
+        //printf("anim %d invalid; moving back one\n\r");
         if (ANIM_NUM == 0) {
             // no valid image - drop into the main loop
+            //printf("no valid animations\n\r");
             return;
         }
         // otherwise go back an image and see if that one's valid
         ANIM_NUM--;
+        animation = userdata + (ANIM_NUM * bootsz);   /* Animations are spaced 64kB apart. */
         memcpy((void *)target, (void *)animation, bootsz);
     }
+    //printf("running image\n\r");
     
     /* Execute it */
     asm volatile(
@@ -89,9 +95,8 @@ int main(void)
     ledpwm[1] = 1;
     ledpwm[3] = 0;
 
-    if      (MISC->button == 2 && ANIM_NUM > 0) ANIM_NUM--;
-    else if (MISC->button == 1 && ANIM_NUM < 100) ANIM_NUM++;
-        
+    ANIM_NUM = 0;
+
     bootload(ANIM_NUM);
     
     /* And finally - the main loop. */

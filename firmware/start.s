@@ -31,6 +31,7 @@ _bios_vtable:
     .word printf_
     .word vprintf_
 
+.balign 16
 setup_crt:
     # initialize the register file
     addi x1, zero, 0
