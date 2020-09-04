@@ -55,5 +55,5 @@ SECTIONS
     } > SRAM
 
     /* Initial stack should start at the end of SRAM. */
-    _stack_start = ORIGIN(SRAM) + LENGTH(SRAM) - 4;
+    _stack_start = ORIGIN(SRAM) + LENGTH(SRAM) - 8;
 }
