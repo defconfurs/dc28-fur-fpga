@@ -59,7 +59,7 @@ module pdm_mic #(
         end
         else begin
             if (output_clk) begin
-                sample1_average <= sample1_average - (sample1_average >> 12) + (mic1_in ? $signed('d1) : $signed('d-1));
+                sample1_average <= sample1_average - (sample1_average >> 12) + (mic1_in ? $signed(1) : $signed(-1));
                 sample1_out     <= (sample1_average > 32767 ? 32767 : (sample1_average < -32768 ? -32768 : sample1_average));
                 //w_address   <= w_address+1;
                 //sample1_out <= sample1_out + (mic1_in ? $signed(12'd1) : $signed(12'd-1)) - (buf_out ? $signed(12'd1) : $signed(12'd-1));

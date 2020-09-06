@@ -367,7 +367,7 @@ module top (
       .externalResetVector(32'h00000000),
       .timerInterrupt(1'b0),
       .softwareInterrupt(1'b0),
-      .externalInterruptArray(32'h00000000),
+      .externalInterruptArray({31'h00000000, button_irq}),
   
       // Instruction Bus.
       .iBusWishbone_CYC(wbc_ibus_cyc),
@@ -496,6 +496,7 @@ module top (
     //---------------------------------------------------------------
     // wishbone connected LED PWM driver
     wire [1:0] buttons;
+    wire       button_irq;
     wire signed [15:0] audio;
 
     assign buttons = { pin_button_up, pin_button_down };
@@ -517,7 +518,8 @@ module top (
   
       .leds       ( { stat_b, stat_g, stat_r } ),
       .buttons    ( buttons ),
-      .audio      ( audio )
+      .audio      ( audio ),
+      .irq        ( button_irq )
     );
   
     //---------------------------------------------------------------

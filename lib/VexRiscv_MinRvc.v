@@ -1,5 +1,5 @@
 // Generator : SpinalHDL v1.3.5    git head : f0505d24810c8661a24530409359554b7cfa271a
-// Date      : 24/08/2020, 21:45:35
+// Date      : 03/09/2020, 20:26:03
 // Component : VexRiscv
 
 
@@ -3459,8 +3459,18 @@ module VexRiscv (
       12'b001100000000 : begin
         execute_CsrPlugin_illegalAccess = 1'b0;
       end
+      12'b101100000000 : begin
+        if(execute_CSR_READ_OPCODE)begin
+          execute_CsrPlugin_illegalAccess = 1'b0;
+        end
+      end
       12'b001101000001 : begin
         execute_CsrPlugin_illegalAccess = 1'b0;
+      end
+      12'b101110000000 : begin
+        if(execute_CSR_READ_OPCODE)begin
+          execute_CsrPlugin_illegalAccess = 1'b0;
+        end
       end
       12'b001100000101 : begin
         if(execute_CSR_WRITE_OPCODE)begin
@@ -3519,8 +3529,14 @@ module VexRiscv (
         execute_CsrPlugin_readData[7 : 7] = CsrPlugin_mstatus_MPIE;
         execute_CsrPlugin_readData[3 : 3] = CsrPlugin_mstatus_MIE;
       end
+      12'b101100000000 : begin
+        execute_CsrPlugin_readData[31 : 0] = CsrPlugin_mcycle[31 : 0];
+      end
       12'b001101000001 : begin
         execute_CsrPlugin_readData[31 : 0] = CsrPlugin_mepc;
+      end
+      12'b101110000000 : begin
+        execute_CsrPlugin_readData[31 : 0] = CsrPlugin_mcycle[63 : 32];
       end
       12'b001100000101 : begin
       end
@@ -3892,7 +3908,11 @@ module VexRiscv (
             CsrPlugin_mstatus_MIE <= _zz_273_[0];
           end
         end
+        12'b101100000000 : begin
+        end
         12'b001101000001 : begin
+        end
+        12'b101110000000 : begin
         end
         12'b001100000101 : begin
         end
@@ -4159,10 +4179,14 @@ module VexRiscv (
       end
       12'b001100000000 : begin
       end
+      12'b101100000000 : begin
+      end
       12'b001101000001 : begin
         if(execute_CsrPlugin_writeEnable)begin
           CsrPlugin_mepc <= execute_CsrPlugin_writeData[31 : 0];
         end
+      end
+      12'b101110000000 : begin
       end
       12'b001100000101 : begin
         if(execute_CsrPlugin_writeEnable)begin
