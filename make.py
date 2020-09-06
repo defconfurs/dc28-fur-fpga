@@ -65,6 +65,7 @@ sources += [ os.path.join(libdir, x) for x in lib_srcs ]
 
 firmwareFiles = ["start.s",
                  "main.c",
+                 "trap.c",
                  "printf.c"]
 firmwareSources = [ os.path.join(firmwaredir, x) for x in firmwareFiles ]
 

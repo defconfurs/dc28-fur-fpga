@@ -10,6 +10,7 @@
 .global main
 .global start
 .global bootload
+.global bootexit
 .global printf_
 .global vprintf_
 
@@ -28,6 +29,7 @@ _entry:
 .type _bios_vtable,@object
 _bios_vtable:
     .word bootload
+    .word bootexit
     .word printf_
     .word vprintf_
 
@@ -65,6 +67,18 @@ setup_crt:
     addi x30, zero, 0
     addi x31, zero, 0
 
+    # Set the trap/interrupt handler.
+    la x29, trap_entry
+    csrw mtvec, x29
+    # Enable external interrupts.
+    li x29, 0x800		# 0x800 External Interrupts
+    csrw mie,x29
+    li x29, 0x008		# 0x008 Enable Interrupts
+    csrw mstatus,x29
+    # CSR_INT_MASK		# VexRiscV interupt mask.
+    li x29, 0x1
+    csrw 0xBC0, x29
+    
     # Copy data from _sreldata to _sdata.
     la a0, _sreldata
     la a1, _sdata
@@ -90,3 +104,77 @@ bss_zfill_skip:
 
     # C-Runtime is ready. Jump to main().
     j main
+
+.globl trap_entry
+.type trap_entry,@function
+.align 4
+trap_entry:
+	# Stack up the registers on interrupt start.
+	addi sp, sp, -128
+	sw x1,   1*4(sp)
+	sw x3,   3*4(sp)
+	sw x4,   4*4(sp)
+	sw x5,   5*4(sp)
+	sw x6,   6*4(sp)
+	sw x7,   7*4(sp)
+	sw x8,   8*4(sp)
+	sw x9,   9*4(sp)
+	sw x10,   10*4(sp)
+	sw x11,   11*4(sp)
+	sw x12,   12*4(sp)
+	sw x13,   13*4(sp)
+	sw x14,   14*4(sp)
+	sw x15,   15*4(sp)
+	sw x16,   16*4(sp)
+	sw x17,   17*4(sp)
+	sw x18,   18*4(sp)
+	sw x19,   19*4(sp)
+	sw x20,   20*4(sp)
+	sw x21,   21*4(sp)
+	sw x22,   22*4(sp)
+	sw x23,   23*4(sp)
+	sw x24,   24*4(sp)
+	sw x25,   25*4(sp)
+	sw x26,   26*4(sp)
+	sw x27,   27*4(sp)
+	sw x28,   28*4(sp)
+	sw x29,   29*4(sp)
+	sw x30,   30*4(sp)
+	sw x31,   31*4(sp)
+
+	add a0, zero, sp
+	call trap
+
+	# Restore the stacked registers.
+	lw x1,   1*4(sp)
+	lw x3,   3*4(sp)
+	lw x4,   4*4(sp)
+	lw x5,   5*4(sp)
+	lw x6,   6*4(sp)
+	lw x7,   7*4(sp)
+	lw x8,   8*4(sp)
+	lw x9,   9*4(sp)
+	lw x10,   10*4(sp)
+	lw x11,   11*4(sp)
+	lw x12,   12*4(sp)
+	lw x13,   13*4(sp)
+	lw x14,   14*4(sp)
+	lw x15,   15*4(sp)
+	lw x16,   16*4(sp)
+	lw x17,   17*4(sp)
+	lw x18,   18*4(sp)
+	lw x19,   19*4(sp)
+	lw x20,   20*4(sp)
+	lw x21,   21*4(sp)
+	lw x22,   22*4(sp)
+	lw x23,   23*4(sp)
+	lw x24,   24*4(sp)
+	lw x25,   25*4(sp)
+	lw x26,   26*4(sp)
+	lw x27,   27*4(sp)
+	lw x28,   28*4(sp)
+	lw x29,   29*4(sp)
+	lw x30,   30*4(sp)
+	lw x31,   31*4(sp)
+	addi sp, sp, 128
+	mret
