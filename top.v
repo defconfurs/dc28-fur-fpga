@@ -448,6 +448,7 @@ module top (
     wire usb_n_rx;
     wire usb_tx_en;
     
+    wire serial_irq;
     wire dfu_detach;
   
     // USB Serial Core.

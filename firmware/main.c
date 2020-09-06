@@ -8,14 +8,20 @@
 
 void _putchar(char ch)
 {
+    uint32_t status;
+
     /* Cook line endings to play nicely with terminals. */
     static char prev = '\0';
     if ((ch == '\n') && (prev != '\r')) _putchar('\r');
     prev = ch;
 
     /* Output the character */
-    while ((SERIAL->isr & 0x02) == 0) { /* nop */}
-    SERIAL->thr = ch;
+    do {
+        status = SERIAL->isr;
+        if ((status & SERIAL_INT_DTR_ACTIVE) == 0) return; /* USB Host is not connected */
+    } while ((status & SERIAL_INT_TXFIFO_EMPTY) == 0);
+    
+    SERIAL->txfifo = ch;
 }
 
 /* Use setjmp/longjmp when returning from an animation. */
@@ -91,11 +97,6 @@ int main(void)
     MISC->leds[0] = 0;
     MISC->leds[1] = 255;
     MISC->leds[3] = 0;
-
-    /* DEBUG: Wait for a character press before starting */
-    while ((SERIAL->isr & 0x01) == 0) {
-        /* nop */
-    }
 
     /* Enable interrupts for testing */
     /* Not sure if this is a hardware problem, but BT0 is extremely noisy. */

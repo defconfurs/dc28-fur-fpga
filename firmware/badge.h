@@ -35,18 +35,17 @@ struct misc_regs {
  *=====================================
  */
 struct serial_regmap {
-    union {
-        uint32_t thr;   // Transmit Holding Register.
-        uint32_t rhr;   // Receive Holding Register.
-    };
-    uint32_t ier;   // Interrupt Enable Register.
-    uint32_t isr;   // Interrupt Status Register.
+    uint32_t rxfifo;    /* Receive Holding Register. */
+    uint32_t txfifo;    /* Transmit Holding Register. */
+    uint32_t ier;       /* Interrupt Enable Register. */
+    uint32_t isr;       /* Interrupt Status Register. */
 } __attribute__((packed));
 #define SERIAL ((volatile struct serial_regmap *)0x40010000)
-#define SERIAL_INT_DATA_READY   0x01
-#define SERIAL_INT_THR_EMPTY    0x02
-#define SERIAL_INT_RECVR_LINE   0x04
-#define SERIAL_INT_MODEM_STATUS 0x08
+
+#define SERIAL_INT_RXDATA_READY 0x01    /* One or more bytes are ready in the RXFIFO */
+#define SERIAL_INT_TXFIFO_EMPTY 0x02    /* The TXFIFO is empty */
+#define SERIAL_INT_DTR_ACTIVE   0x04    /* Data Terminal Ready signal is active */
+#define SERIAL_INT_RTS_ACTIVE   0x08    /* Ready to Send signal is active */
 
 /*=====================================
  * Display Memory
