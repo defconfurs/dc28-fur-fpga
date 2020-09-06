@@ -45,74 +45,38 @@ module wbcrouter #(
     input wire [NS-1:0]      i_serr
   );
 
-  localparam M_GRANT_BITS = $clog2(NS+1);
-  localparam M_GRANT_SIZE = (1 << M_GRANT_BITS);
-
-  wire          m_sack[M_GRANT_SIZE-1:0];
-  wire [DW-1:0] m_sdata[M_GRANT_SIZE-1:0];
-  wire          m_serr[M_GRANT_SIZE-1:0];
-  
   // Muxing Selections.
-  wire [M_GRANT_BITS-1:0] m_decode;   /* Decoded slave the master is requesting. */
-  wire [M_GRANT_SIZE-1:0] m_decode_decoded;
+  wire [NS-1:0]           m_decode_hit;
+  wire [MUXWIDTH-1:0]     m_addr_top = i_maddr[AW-1 : AW-MUXWIDTH];
 
   genvar                  gS;
   integer                 iS;
   generate
-    ///////////////////////////////////
-    // Master Decoding and Multiplexing
-    ///////////////////////////////////
-    // Decode the master address.
-    wbcdecoder#(
-      .ADDRWIDTH(AW),
-      .MUXWIDTH (MUXWIDTH),
-      .OUTWIDTH (M_GRANT_BITS),
-      .NS       (NS),
-      .SLAVE_MUX(SLAVE_MUX)
-    ) m_decode_inst (
-      .addr(i_maddr),
-      .decode(m_decode)
-    );
-
-    ///////////////////////////////////
-    // Slave Decoding and Multiplexing
-    ///////////////////////////////////
+    // Connect master outputs to slave inputs.
     for (gS = 0; gS < NS; gS = gS + 1) begin
-      assign m_decode_decoded[gS] = (gS == m_decode);
-      // Wire inputs from slave to the mux array.
-      assign m_sack[gS]  = i_sack[gS];
-      assign m_sdata[gS] = i_sdata[DW+(gS*DW)-1:gS*DW];
-      assign m_serr[gS]  = i_serr[gS];
+      assign m_decode_hit[gS] = (m_addr_top == SLAVE_MUX[(gS*MUXWIDTH)+MUXWIDTH-1 : (gS*MUXWIDTH)]);
 
       // Wire outputs to master from the mux array.
-      assign o_scyc[gS]                     = m_decode_decoded[gS] & i_mcyc;
-      assign o_sstb[gS]                     = m_decode_decoded[gS] & i_mstb;
-      assign o_swe[gS]                      = m_decode_decoded[gS] & i_mwe;
-      assign o_saddr[SAW+(gS*SAW)-1:gS*SAW] = {SAW{m_decode_decoded[gS]}} & i_maddr[SAW:0];
-      assign o_sdata[DW+(gS*DW)-1:gS*DW]    = {DW{m_decode_decoded[gS]}} & i_mdata;
-      assign o_ssel[SW+(gS*SW)-1:gS*SW]     = {SW{m_decode_decoded[gS]}} & i_msel;
-    end
-    // Fill the remainder of the mux array with empty data, to
-    // set the un-selected state of the outputs to the master.
-    for (gS = NS; gS < M_GRANT_SIZE; gS = gS + 1) begin
-      assign m_sdata[gS] = {DW{1'b0}};
-      assign m_sack[gS]  = 1'b0;
-      assign m_serr[gS]  = 1'b0;
-      assign m_decode_decoded[gS] = 0;
+      assign o_scyc[gS]                     = m_decode_hit[gS] & i_mcyc;
+      assign o_sstb[gS]                     = m_decode_hit[gS] & i_mstb;
+      assign o_swe[gS]                      = m_decode_hit[gS] & i_mwe;
+      assign o_saddr[SAW+(gS*SAW)-1:gS*SAW] = i_maddr[SAW-1:0];
+      assign o_sdata[DW+(gS*DW)-1:gS*DW]    = i_mdata;
+      assign o_ssel[SW+(gS*SW)-1:gS*SW]     = i_msel;
     end
 
-    // Connect up the slave to the master
+    // Connect slave outputs to master inputs.
     always @(*) begin
       // set defaults
       o_mack  = 0;
       o_mdata = 0;
       o_merr  = 0;
 
-      for (iS = 0; iS < M_GRANT_SIZE; iS = iS + 1) begin
-        if (m_decode_decoded[iS]) begin
-          o_mack  = m_sack[iS];
-          o_mdata = m_sdata[iS];
-          o_merr  = m_serr[iS];
+      for (iS = 0; iS < NS; iS = iS + 1) begin
+        if (m_decode_hit[iS]) begin
+          o_mack  = i_sack[iS];
+          o_mdata = i_sdata[DW+(iS*DW)-1 : iS*DW];
+          o_merr  = i_serr[iS];
         end
       end
     end
