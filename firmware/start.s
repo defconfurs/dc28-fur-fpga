@@ -68,7 +68,7 @@ setup_crt:
     addi x31, zero, 0
 
     # Set the trap/interrupt handler.
-    la x29, trap_entry
+    la x29, __trap_entry
     csrw mtvec, x29
     # Enable external interrupts.
     li x29, 0x800		# 0x800 External Interrupts
@@ -105,76 +105,116 @@ bss_zfill_skip:
     # C-Runtime is ready. Jump to main().
     j main
 
-.globl trap_entry
-.type trap_entry,@function
 .align 4
-trap_entry:
-	# Stack up the registers on interrupt start.
-	addi sp, sp, -128
-	sw x1,   1*4(sp)
-	sw x3,   3*4(sp)
-	sw x4,   4*4(sp)
-	sw x5,   5*4(sp)
-	sw x6,   6*4(sp)
-	sw x7,   7*4(sp)
-	sw x8,   8*4(sp)
-	sw x9,   9*4(sp)
-	sw x10,   10*4(sp)
-	sw x11,   11*4(sp)
-	sw x12,   12*4(sp)
-	sw x13,   13*4(sp)
-	sw x14,   14*4(sp)
-	sw x15,   15*4(sp)
-	sw x16,   16*4(sp)
-	sw x17,   17*4(sp)
-	sw x18,   18*4(sp)
-	sw x19,   19*4(sp)
-	sw x20,   20*4(sp)
-	sw x21,   21*4(sp)
-	sw x22,   22*4(sp)
-	sw x23,   23*4(sp)
-	sw x24,   24*4(sp)
-	sw x25,   25*4(sp)
-	sw x26,   26*4(sp)
-	sw x27,   27*4(sp)
-	sw x28,   28*4(sp)
-	sw x29,   29*4(sp)
-	sw x30,   30*4(sp)
-	sw x31,   31*4(sp)
+__trap_entry:
+    # Stack up the arugment registers fist, and check for ecall.
+    addi sp, sp, -128
+    sw x10,   10*4(sp)
+    sw x11,   11*4(sp)
+    sw x12,   12*4(sp)
+    sw x13,   13*4(sp)
+    sw x14,   14*4(sp)
+    sw x15,   15*4(sp)
+    sw x16,   16*4(sp)
+    sw x17,   17*4(sp)
 
-	add a0, zero, sp
-	call trap
+    # Pass the cause and PC as the second and third arguments.
+    csrr a1, mcause
+    csrr a2, mepc
 
-	# Restore the stacked registers.
-	lw x1,   1*4(sp)
-	lw x3,   3*4(sp)
-	lw x4,   4*4(sp)
-	lw x5,   5*4(sp)
-	lw x6,   6*4(sp)
-	lw x7,   7*4(sp)
-	lw x8,   8*4(sp)
-	lw x9,   9*4(sp)
-	lw x10,   10*4(sp)
-	lw x11,   11*4(sp)
-	lw x12,   12*4(sp)
-	lw x13,   13*4(sp)
-	lw x14,   14*4(sp)
-	lw x15,   15*4(sp)
-	lw x16,   16*4(sp)
-	lw x17,   17*4(sp)
-	lw x18,   18*4(sp)
-	lw x19,   19*4(sp)
-	lw x20,   20*4(sp)
-	lw x21,   21*4(sp)
-	lw x22,   22*4(sp)
-	lw x23,   23*4(sp)
-	lw x24,   24*4(sp)
-	lw x25,   25*4(sp)
-	lw x26,   26*4(sp)
-	lw x27,   27*4(sp)
-	lw x28,   28*4(sp)
-	lw x29,   29*4(sp)
-	lw x30,   30*4(sp)
-	lw x31,   31*4(sp)
-	addi sp, sp, 128
-	mret
+    # Check if we faulted on an ecall instruction.
+    li a0, 0x02         # Check for mcause == 0x02 (illegal instruction)
+    bne a0, a1, __trap_not_ecall
+    lw a3, 0(a2)        # Load the faulting instruction.
+    li a0, 0x73         # Check for instruction == 0x7C (ecall)
+    bne a0, a3, __trap_not_ecall
+
+    # Handle the ecall instruction.
+    addi a0, sp, 40 # Pass the stacked ecall as the first argument.
+    addi a1, a1, 4
+    csrw mepc, a1   # Return passed the faulting instruction.
+    la x1, __trap_return_ecall
+    j rv_ecall
+
+__trap_not_ecall:
+    # Stack up the remaining registers.
+    sw x1,   1*4(sp)
+    sw x3,   3*4(sp)
+    sw x4,   4*4(sp)
+    sw x5,   5*4(sp)
+    sw x6,   6*4(sp)
+    sw x7,   7*4(sp)
+    sw x8,   8*4(sp)
+    sw x9,   9*4(sp)
+    sw x18,  18*4(sp)
+    sw x19,  19*4(sp)
+    sw x20,  20*4(sp)
+    sw x21,  21*4(sp)
+    sw x22,  22*4(sp)
+    sw x23,  23*4(sp)
+    sw x24,  24*4(sp)
+    sw x25,  25*4(sp)
+    sw x26,  26*4(sp)
+    sw x27,  27*4(sp)
+    sw x28,  28*4(sp)
+    sw x29,  29*4(sp)
+    sw x30,  30*4(sp)
+    sw x31,  31*4(sp)
+
+    # Passed the stacked registers to the handler.
+    # and return to __trap_return when done.
+    add a0, zero, sp
+    la x1, __trap_return
+    
+    # Call the exception handler.
+    blt a1, zero, __trap_irq_launch
+    j rv_exception
+
+__trap_irq_launch:
+    la s0, __trap_irq_vector
+    andi s1, a1, 0xC
+    add s0, s0, s1
+    lw s0, 0(s0)
+    jr s0
+
+.type __trap_irq_vector,@object
+__trap_irq_vector:
+    .word rv_irq_software
+    .word rv_irq_timer
+    .word rv_irq_extint
+
+__trap_return:
+    # Restore the stacked registers.
+    lw x1,   1*4(sp)
+    lw x3,   3*4(sp)
+    lw x4,   4*4(sp)
+    lw x5,   5*4(sp)
+    lw x6,   6*4(sp)
+    lw x7,   7*4(sp)
+    lw x8,   8*4(sp)
+    lw x9,   9*4(sp)
+    lw x18,   18*4(sp)
+    lw x19,   19*4(sp)
+    lw x20,   20*4(sp)
+    lw x21,   21*4(sp)
+    lw x22,   22*4(sp)
+    lw x23,   23*4(sp)
+    lw x24,   24*4(sp)
+    lw x25,   25*4(sp)
+    lw x26,   26*4(sp)
+    lw x27,   27*4(sp)
+    lw x28,   28*4(sp)
+    lw x29,   29*4(sp)
+    lw x30,   30*4(sp)
+    lw x31,   31*4(sp)
+__trap_return_ecall:
+    lw x10,   10*4(sp)
+    lw x11,   11*4(sp)
+    lw x12,   12*4(sp)
+    lw x13,   13*4(sp)
+    lw x14,   14*4(sp)
+    lw x15,   15*4(sp)
+    lw x16,   16*4(sp)
+    lw x17,   17*4(sp)
+    addi sp, sp, 128
+    mret
