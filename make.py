@@ -2,6 +2,7 @@
 import os
 import sys
 import argparse
+import subprocess
 from subprocess import call
 from glob import glob
 
@@ -11,6 +12,7 @@ firmwaredir = os.path.join(srcdir, "firmware")
 ldsfile = os.path.join(firmwaredir,'firmware.lds')
 
 CFLAGS = ['-Os', '-march=rv32ic', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
+CFLAGS += ['-ffunction-sections', '-fdata-sections', '--specs=nano.specs']
 CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_FLOAT=1', '-DPRINTF_DISABLE_SUPPORT_EXPONENTIAL=1']
 CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_LONG_LONG=1', '-DPRINTF_DISABLE_SUPPORT_PTRDIFF_T=1']
 LDFLAGS = CFLAGS + ['-Wl,-Bstatic,-T,'+ldsfile+',--gc-sections']
@@ -66,7 +68,7 @@ sources += [ os.path.join(libdir, x) for x in lib_srcs ]
 firmwareFiles = ["start.s",
                  "main.c",
                  "trap.c",
-                 "printf.c"]
+                 "bios_printf.c"]
 firmwareSources = [ os.path.join(firmwaredir, x) for x in firmwareFiles ]
 
 
@@ -92,6 +94,7 @@ if os.name=='nt':
     iceprog       = os.path.join(pio, 'toolchain-ice40\\bin\\iceprog.exe')
     gcc           = os.path.join(platformio, 'toolchain-riscv\\bin\\riscv64-unknown-elf-gcc.exe')
     objcopy       = os.path.join(platformio, 'toolchain-riscv\\bin\\riscv64-unknown-elf-objcopy.exe')
+    size          = os.path.join(platformio, 'toolchain-riscv\\bin\\riscv64-unknown-elf-size.exe')
     verilator     = os.path.join(pio, 'toolchain-verilator\\bin\\verilator.exe')
     
 else:
@@ -108,6 +111,7 @@ else:
         iceprog       = os.path.join(pio, 'toolchain-icestorm/bin/iceprog')
         gcc           = os.path.join(pio, 'toolchain-riscv/bin/riscv64-unknown-elf-gcc')
         objcopy       = os.path.join(pio, 'toolchain-riscv/bin/riscv64-unknown-elf-objcopy')
+        size          = os.path.join(pio, 'toolchain-riscv/bin/riscv64-unknown-elf-size')
         verilator     = os.path.join(pio, 'toolchain-verilator/bin/verilator.exe')
     # Otherwise, assume the tools are in the PATH.
     else:
@@ -119,6 +123,7 @@ else:
         iceprog       = 'iceprog'
         gcc           = 'riscv64-unknown-elf-gcc'
         objcopy       = 'riscv64-unknown-elf-objcopy'
+        size          = 'riscv64-unknown-elf-size'
         verilaotor    = 'verilator'
 
 def hexdump(infile, outfile):
@@ -211,6 +216,7 @@ def build_rom(*args, name='firmware'):
        name (string): Name of the firmware image (default: "firmware")
        *args (string): All other non-kwargs should provide the source files for the firmware.
     """
+    print("Rebuilding Firmware:")
 
     objfiles = []
     
@@ -240,9 +246,11 @@ def build_rom(*args, name='firmware'):
 
     memfile = os.path.join(srcdir, name + '.mem')
     hexdump(binfile, memfile)
-    
 
-    
+    print("Firmware Memory Usage:")
+    call([size, '-t', elffile], stderr=subprocess.STDOUT)
+
+
 #######################################
 ## Simulate target
 #######################################

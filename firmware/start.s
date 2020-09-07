@@ -30,8 +30,8 @@ _entry:
 _bios_vtable:
     .word bootload
     .word bootexit
-    .word printf_
-    .word vprintf_
+    .word bios_printf
+    .word bios_vprintf
 
 .balign 16
 setup_crt:
@@ -125,14 +125,17 @@ __trap_entry:
     # Check if we faulted on an ecall instruction.
     li a0, 0x02         # Check for mcause == 0x02 (illegal instruction)
     bne a0, a1, __trap_not_ecall
-    lw a3, 0(a2)        # Load the faulting instruction.
+    lh a3, 0(a2)        # Load low half of the instruction (possible misalignment)
+    lh a4, 2(a2)        # Load high half of the instruction (possible misalignment)
     li a0, 0x73         # Check for instruction == 0x7C (ecall)
+    bnez a4, __trap_not_ecall
     bne a0, a3, __trap_not_ecall
 
     # Handle the ecall instruction.
-    addi a0, sp, 40 # Pass the stacked ecall as the first argument.
-    addi a1, a1, 4
-    csrw mepc, a1   # Return passed the faulting instruction.
+    addi a0, a2, 4  # Return passed the faulting instruction.
+    csrw mepc, a0
+    addi a0, a7, 0  # Pass the syscall number as the first argument.
+    addi a1, sp, 40 # Pass the stacked argument registers as the second argument.
     la x1, __trap_return_ecall
     j rv_ecall
 
@@ -178,6 +181,7 @@ __trap_irq_launch:
     jr s0
 
 .type __trap_irq_vector,@object
+.align 4
 __trap_irq_vector:
     .word rv_irq_software
     .word rv_irq_timer

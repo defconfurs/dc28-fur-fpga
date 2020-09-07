@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <string.h>
-#include <printf.h>
 #include <string.h>
 #include <setjmp.h>
 
@@ -50,8 +49,8 @@ void bootload(int slot)
 
     /* For the animation to be valid - the tag must match, and the entry point should be sane */
     if (hdr->tag != BOOT_HDR_TAG) {
-        printf("Bad animation found at slot %d\n", slot);
-        printf("\ttag = 0x%08x, start=%d, size = %d\n", hdr->tag, hdr->data_start, hdr->data_size);
+        bios_printf("Bad animation found at slot %d\n", slot);
+        bios_printf("\ttag = 0x%08x, start=%d, size = %d\n", hdr->tag, hdr->data_start, hdr->data_size);
         bootexit(1);
     }
 
@@ -110,7 +109,7 @@ int main(void)
     /* Return here after an animation exits. */
     retcode = setjmp(bootjmp);
     if (retcode != 0) {
-        printf("Animation at slot %d exitied with code=%d\n", slot, retcode);
+        bios_printf("Animation at slot %d exitied with code=%d\n", slot, retcode);
         if (retcode == 1) {
             /* Seek the animation forward. */
             if (slot < count-1) slot++;

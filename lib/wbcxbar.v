@@ -140,7 +140,7 @@ generate
         assign o_scyc[gS]                     = m_mcyc[s_grant];
         assign o_sstb[gS]                     = m_mstb[s_grant];
         assign o_swe[gS]                      = m_mwe[s_grant];
-        assign o_saddr[SAW+(gS*SAW)-1:gS*SAW] = m_maddr[s_grant][SAW:0];
+        assign o_saddr[SAW+(gS*SAW)-1:gS*SAW] = m_maddr[s_grant][SAW-1:0];
         assign o_sdata[DW+(gS*DW)-1:gS*DW]    = m_mdata[s_grant];
         assign o_ssel[SW+(gS*SW)-1:gS*SW]     = m_msel[s_grant];
     end

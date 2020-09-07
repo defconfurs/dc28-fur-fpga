@@ -17,6 +17,9 @@ struct bios_vtable {
 };
 #define VTABLE ((const struct bios_vtable *)0x00000010)
 
+void bios_printf(const char *fmt, ...);
+void bios_vprintf(const char *fmt, va_list ap);
+
 /*=====================================
  * Miscellaneous Peripherals
  *=====================================
