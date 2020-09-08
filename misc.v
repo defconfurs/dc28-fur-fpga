@@ -5,22 +5,22 @@ module wb_misc #(
       parameter DW = 32
 )    (
       // Wishbone interface.
-      input wire            wb_clk_i,
-      input wire            wb_reset_i,
-      input wire [AW-1:0]   wb_adr_i,
-      input wire [DW-1:0]   wb_dat_i,
-      output reg [DW-1:0]   wb_dat_o,
-      input wire            wb_we_i,
-      input wire [DW/8-1:0] wb_sel_i,
-      output reg            wb_ack_o,
-      input wire            wb_cyc_i,
-      input wire            wb_stb_i,
+      input wire              wb_clk_i,
+      input wire              wb_reset_i,
+      input wire [AW-1:0]     wb_adr_i,
+      input wire [DW-1:0]     wb_dat_i,
+      output reg [DW-1:0]     wb_dat_o,
+      input wire              wb_we_i,
+      input wire [DW/8-1:0]   wb_sel_i,
+      output reg              wb_ack_o,
+      input wire              wb_cyc_i,
+      input wire              wb_stb_i,
 
       // Controllable LEDs.
-      output wire [2:0]     leds,
-      input wire [1:0]      buttons,
-      input signed [15:0]   audio,
-      output wire           irq
+      output wire [2:0]       leds,
+      input wire [1:0]        buttons,
+      input wire signed [7:0] audio,
+      output wire             irq
     );
 
     // Only use the LSB nibble for address decoding.
@@ -72,7 +72,7 @@ module wb_misc #(
             REG_LED_GREEN:  wb_dat_o <= { {(DW-8){1'b0}}, reg_intensity[1] };
             REG_LED_BLUE:   wb_dat_o <= { {(DW-8){1'b0}}, reg_intensity[2] };
             REG_BUTTONS:    wb_dat_o <= { {(DW-2){1'b0}}, buttons };
-            REG_MIC_DATA:   wb_dat_o <= { {(DW-16){audio[15]}}, audio };
+            REG_MIC_DATA:   wb_dat_o <= { {(DW-8){audio[7]}}, audio };
             REG_INT_ENABLE: wb_dat_o <= { {(DW-4){1'b0}}, reg_int_enable };
             REG_INT_STATUS: wb_dat_o <= { {(DW-4){1'b0}}, reg_int_status };
             default:        wb_dat_o <= 0;

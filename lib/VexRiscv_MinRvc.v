@@ -1234,7 +1234,7 @@ module VexRiscv (
   assign _zz_254_ = (execute_IS_RVC ? (3'b010) : (3'b100));
   assign _zz_255_ = execute_INSTRUCTION[19 : 15];
   assign _zz_256_ = execute_INSTRUCTION[31 : 20];
-  assign _zz_257_ = {execute_INSTRUCTION[31 : 25],execute_INSTRUCTION[11 : 7]};
+  assign _zz_257_ = {execute_INSTRUCTION[31 : 25],execute_INSTRUCTION[11 : 7]};  
   assign _zz_258_ = ($signed(_zz_259_) + $signed(_zz_262_));
   assign _zz_259_ = ($signed(_zz_260_) + $signed(_zz_261_));
   assign _zz_260_ = execute_SRC1;
@@ -3970,10 +3970,10 @@ module VexRiscv (
       IBusSimplePlugin_mmu_joinCtx_refilling <= IBusSimplePlugin_mmuBus_rsp_refilling;
     end
     if(!(! (((dBus_rsp_ready && memory_MEMORY_ENABLE) && memory_arbitration_isValid) && memory_arbitration_isStuck))) begin
-      $display("ERROR DBusSimplePlugin doesn't allow memory stage stall when read happend");
+      //$display("ERROR DBusSimplePlugin doesn't allow memory stage stall when read happend");
     end
     if(!(! (((writeBack_arbitration_isValid && writeBack_MEMORY_ENABLE) && (! writeBack_MEMORY_STORE)) && writeBack_arbitration_isStuck))) begin
-      $display("ERROR DBusSimplePlugin doesn't allow writeback stage stall when read happend");
+      //$display("ERROR DBusSimplePlugin doesn't allow writeback stage stall when read happend");
     end
     if(_zz_193_)begin
       if(_zz_196_)begin

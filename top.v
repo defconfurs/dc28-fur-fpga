@@ -108,9 +108,9 @@ module top (
     assign pin_r3a         = row_data[6];
     assign pin_r3b         = row_data[7];
 
-    assign pin_iob_9b  = 0;
-    assign pin_iob_8a  = 0;
-    assign pin_iob_13b = 0;
+    assign pin_iob_9b  = debug[2];
+    assign pin_iob_8a  = debug[1];
+    assign pin_iob_13b = debug[0];
   
   
     wire flash_busy;
@@ -432,7 +432,7 @@ module top (
     );
   
     
-    assign debug = { 0 };
+    //assign debug = { 0 };
   
   
     //---------------------------------------------------------------
@@ -498,7 +498,7 @@ module top (
     // wishbone connected LED PWM driver
     wire [1:0] buttons;
     wire       button_irq;
-    wire signed [15:0] audio;
+    wire signed [7:0] audio;
 
     assign buttons = { pin_button_up, pin_button_down };
     
@@ -608,7 +608,9 @@ module top (
       .spi_sel   ( spi_sel   ),
       .spi_d_out ( spi_d_out ),
       .spi_d_in  ( spi_d_in  ),
-      .spi_d_dir ( spi_d_dir )
+      .spi_d_dir ( spi_d_dir ),
+
+      .debug (debug[3:0])
     );
   
     
@@ -656,9 +658,10 @@ module top (
   
     //---------------------------------------------------------------
     // Audio
-  
+
+    
     pdm_mic #(
-      .SAMPLE_DEPTH      ( 16 )
+      .SAMPLE_DEPTH      ( 8 )
     ) mic_inst (
       .clk ( clk ),
       .rst ( rst ),

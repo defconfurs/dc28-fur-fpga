@@ -123,9 +123,6 @@ module led_matrix #(
 
     localparam TOTAL_LOAD_TIME_SIZE = TOTAL_LOAD_TIME > TOTAL_LINE_TIME ? $clog2(TOTAL_LOAD_TIME+1) : $clog2(TOTAL_LINE_TIME+1);
 
-    localparam COL_STEP =  1*2;
-    localparam ROW_STEP = 32*2;
-
     localparam N_COLS_SIZE = $clog2(N_COLS+1);
     localparam N_ROWS_SIZE = $clog2(N_ROWS+1);
   
@@ -153,37 +150,38 @@ module led_matrix #(
     //===========================================================================================
     // Pixel Reader
   
-  localparam FIELD_RED   = 3'b001;
-  localparam FIELD_GREEN = 3'b010;
-  localparam FIELD_BLUE  = 3'b100;
-  reg [2:0] current_field = FIELD_BLUE;
+    localparam FIELD_RED   = 3'b001;
+    localparam FIELD_GREEN = 3'b010;
+    localparam FIELD_BLUE  = 3'b100;
+    reg [2:0] current_field = FIELD_BLUE;
   
     reg [5:0] pixel_out;
 
     always @(*) begin
-        if (latched_frame_address == 0) pixel_out <= 0;
+        if (latched_frame_address == 0) pixel_out = 0;
         else begin
             case (current_field)
-            FIELD_RED:   pixel_out <= { ram_data_out[15:11], 1'b0 };
-            FIELD_GREEN: pixel_out <= { ram_data_out[10:5] };
-            FIELD_BLUE:  pixel_out <= { ram_data_out[4:0], 1'b0 };
-            default:     pixel_out <= { ram_data_out[4:0], 1'b0 };
+            FIELD_RED:   pixel_out = { ram_data_out[15:11], 1'b0 };
+            FIELD_GREEN: pixel_out = { ram_data_out[10:5] };
+            FIELD_BLUE:  pixel_out = { ram_data_out[4:0], 1'b0 };
+            default:     pixel_out = { ram_data_out[4:0], 1'b0 };
             endcase
         end
     end
   
-    reg [N_ROWS_SIZE:0]          pixel_being_updated = 0;
-    reg [N_COLS_SIZE-1:0]        current_col = 0;
+    reg [N_ROWS_SIZE:0]   pixel_being_updated = 0;
+    reg [N_COLS_SIZE-1:0] current_col = 0;
   
 
     reg [TOTAL_LOAD_TIME_SIZE-1:0] load_timer = 0;
+    //wire [15:0]           load_timer;
 
     //===========================================================================================
     // Nonlinear timer
-    reg [7:0] brightness_lut_out;
+    reg [4:0] brightness_lut_out;
     reg [7:0] brightness_lut_mem [63:0];
 
-    reg [7:0] pwm_pos_timer;
+    reg [4:0] pwm_pos_timer;
     reg [5:0] pwm_pos;
   
     initial begin
@@ -191,7 +189,7 @@ module led_matrix #(
     end
   
     always @(posedge clk) begin
-        brightness_lut_out <= brightness_lut_mem[pwm_pos];
+        brightness_lut_out <= brightness_lut_mem[pwm_pos][4:0];
     end
   
     always @(posedge clk) begin
@@ -218,8 +216,62 @@ module led_matrix #(
     assign xpos = { current_col, pixel_being_updated[0] };
     assign ypos = { pixel_being_updated[4:1] };
 
-    assign ram_address = (latched_frame_address + 
-                          ({ ypos[3:0], xpos[4:1], xpos[0]^ypos[0] }));
+    wire [31:0] dsp_output;
+    
+    SB_MAC16 #(
+        .NEG_TRIGGER              ( 0     ),
+        .C_REG                    ( 0     ),
+        .A_REG                    ( 0     ),
+        .B_REG                    ( 0     ),
+        .D_REG                    ( 0     ),
+        .TOP_8x8_MULT_REG         ( 0     ),
+        .BOT_8x8_MULT_REG         ( 0     ),
+        .PIPELINE_16x16_MULT_REG1 ( 0     ),
+        .PIPELINE_16x16_MULT_REG2 ( 0     ),
+        .TOPOUTPUT_SELECT         ( 2'b00 ),
+        .TOPADDSUB_LOWERINPUT     ( 2'b00 ),
+        .TOPADDSUB_UPPERINPUT     ( 1     ),
+        .TOPADDSUB_CARRYSELECT    ( 2'b00 ),
+        .BOTOUTPUT_SELECT         ( 2'b00 ),
+        .BOTADDSUB_LOWERINPUT     ( 2'b00 ),
+        .BOTADDSUB_UPPERINPUT     ( 0     ),
+        .BOTADDSUB_CARRYSELECT    ( 2'b00 ),
+        .MODE_8x8                 ( 0     ),
+        .A_SIGNED                 ( 0     ),
+        .B_SIGNED                 ( 0     )
+    ) addr_dsp (
+        .CLK       ( clk ), // input
+        .CE        ( 1 ), // input
+        .A         ( latched_frame_address ), // input [15:0]
+        .B         ( 0 ), // input [15:0]
+        .C         ( { ypos[3:0], xpos[4:1], xpos[0]^ypos[0] } ), // input [15:0]
+        .D         ( 0 ), // input [15:0]
+        .AHOLD     ( 0 ), // input 
+        .BHOLD     ( 0 ), // input 
+        .CHOLD     ( 0 ), // input 
+        .DHOLD     ( 0 ), // input 
+        .IRSTTOP   ( 0 ), // input 
+        .IRSTBOT   ( 0 ), // input 
+        .ORSTTOP   ( 0 ), // input 
+        .ORSTBOT   ( 0 ), // input 
+        .OLOADTOP  ( 0 ), // input 
+        .OLOADBOT  ( 0 ), // input 
+        .ADDSUBTOP ( 0 ), // input 
+        .ADDSUBBOT ( 0 ), // input 
+        .OHOLDTOP  ( 0 ), // input
+        .OHOLDBOT  ( 0 ), // input
+        .CI        ( 0 ), // input
+        .ACCUMCI   ( 0 ), // input
+        .SIGNEXTIN ( 0 ), // input
+        .O         ( dsp_output ), // output [31:0]
+        .CO        (  ), // output
+        .ACCUMCO   (  ), // output
+        .SIGNEXTOUT(  )  // output
+    );
+    assign ram_address    = dsp_output[31:16];
+    
+    //assign ram_address = (latched_frame_address + 
+    //                      ({ ypos[3:0], xpos[4:1], xpos[0]^ypos[0] }));
 
 
     //==============================
@@ -248,7 +300,7 @@ module led_matrix #(
         end
     end
     //==============================
-  
+
   
     integer i;
     always @(posedge clk or posedge rst) begin
@@ -260,6 +312,7 @@ module led_matrix #(
             pixel_being_updated   <= 0;
             latched_frame_address <= 0;
             for (i = 0; i < N_ROWS<<1; i = i+1) latched_pixels[i] <= 0;
+
         end
     
         else begin
@@ -321,8 +374,8 @@ module led_matrix #(
                 frame_complete <= 0;
       
                 if (!load_timer) begin
-                    load_state <= LOAD_STATE_DISPLAY;
-                    load_timer <= TOTAL_LINE_TIME;
+                    load_state          <= LOAD_STATE_DISPLAY;
+                    load_timer          <= TOTAL_LINE_TIME;
                 
                     if (current_field == FIELD_BLUE) begin
                         if (current_col < N_COLS-1) begin
@@ -342,8 +395,8 @@ module led_matrix #(
                 frame_complete <= 1;
       
                 if (load_timer == 0) begin
-                    load_state <= LOAD_STATE_START_REQUEST;
-                    load_timer <= TOTAL_LOAD_TIME;
+                    load_state          <= LOAD_STATE_START_REQUEST;
+                    load_timer          <= TOTAL_LOAD_TIME;
                 end
             end
             
@@ -374,9 +427,11 @@ module led_matrix #(
     reg [7:0] col_latch_state;
     reg [7:0] next_col_latch_state;
 
+    reg       reset_latch_state;
     always @(*) begin
         row_data       = 8'b000000;
         latch_row_bank = 4'b0000;
+        reset_latch_state = 0;
         
         case (col_latch_state)
         COL_LATCH_STATE_0: begin
@@ -418,21 +473,14 @@ module led_matrix #(
             row_data       = {4'd0, led_out_state[27:24]};
             latch_row_bank = 4'b1000;
         end
+        default:
+            reset_latch_state = 1;
         endcase
     end
       
     always @(posedge clk) begin
-        case (col_latch_state)
-        COL_LATCH_STATE_0:  col_latch_state <= COL_LATCH_STATE_0L;
-        COL_LATCH_STATE_0L: col_latch_state <= COL_LATCH_STATE_1;
-        COL_LATCH_STATE_1:  col_latch_state <= COL_LATCH_STATE_1L;
-        COL_LATCH_STATE_1L: col_latch_state <= COL_LATCH_STATE_2;
-        COL_LATCH_STATE_2:  col_latch_state <= COL_LATCH_STATE_2L;
-        COL_LATCH_STATE_2L: col_latch_state <= COL_LATCH_STATE_3;
-        COL_LATCH_STATE_3:  col_latch_state <= COL_LATCH_STATE_3L;
-        COL_LATCH_STATE_3L: col_latch_state <= COL_LATCH_STATE_0;
-        default:            col_latch_state <= COL_LATCH_STATE_0;
-        endcase
+        if (reset_latch_state) col_latch_state <= 8'b00000001;
+        else                   col_latch_state <= { col_latch_state[6:0], col_latch_state[7] };
     end
 
     assign row_oe      = 0;

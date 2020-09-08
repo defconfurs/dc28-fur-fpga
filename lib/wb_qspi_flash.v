@@ -4,26 +4,28 @@
 module wb_qspi_flash #(
     parameter AW   = 24,
     parameter DW   = 32
-) (
-    input wire          wb_reset_i,
-    input wire          wb_clk_i,
+)  (
+    input wire              wb_reset_i,
+    input wire              wb_clk_i,
 
     // Wishbone interface
-    input wire [AW-1:0] wb_adr_i,
-    input wire [DW-1:0] wb_dat_i,
-    output wire [DW-1:0] wb_dat_o,
-    input wire          wb_we_i,
+    input wire [AW-1:0]     wb_adr_i,
+    input wire [DW-1:0]     wb_dat_i,
+    output wire [DW-1:0]    wb_dat_o,
+    input wire              wb_we_i,
     input wire [(DW/8)-1:0] wb_sel_i,
-    input wire          wb_stb_i,
-    input wire          wb_cyc_i,
-    output reg          wb_ack_o,
+    input wire              wb_stb_i,
+    input wire              wb_cyc_i,
+    output reg              wb_ack_o,
 
     // (Q)SPI interface
-    output wire         spi_clk,
-    output wire         spi_sel,
-    output reg [3:0]    spi_d_out,
-    input wire [3:0]    spi_d_in,
-    output reg [3:0]    spi_d_dir
+    output wire             spi_clk,
+    output wire             spi_sel,
+    output reg [3:0]        spi_d_out,
+    input wire [3:0]        spi_d_in,
+    output reg [3:0]        spi_d_dir,
+    
+    output wire [3:0]       debug
     );
     
     localparam XFER_STATE_INIT      = 4'h0; /* Reset state */
@@ -43,6 +45,12 @@ module wb_qspi_flash #(
     localparam SPI_READ_COMMAND   = 8'hEB;  /* Quad I/O Read command (1-4-4) */
     localparam SPI_READ_DUMMY_CLOCKS = 8;   /* Cypress S25064L Series - 8 dummy clocks. */
 
+    assign debug = {1'b0,
+                    xfer_state == XFER_STATE_IDLE,
+                    xfer_state == XFER_STATE_WR_ENABLE,
+                    xfer_state == XFER_STATE_INIT};
+                    
+    
     localparam SPI_ADDR_BITS = 24;
     localparam WB_ADDR_BITS = SPI_ADDR_BITS-$clog2(DW/8);
     wire [SPI_ADDR_BITS-1:0] wb_addr_local;
