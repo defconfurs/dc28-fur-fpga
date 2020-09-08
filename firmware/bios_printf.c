@@ -46,7 +46,7 @@ bios_div10(unsigned int n)
     q = q + (q >> 8);
     q = q + (q >> 16);
     q = q >> 3;
-    r = n - (((q << 2) + q) << 1);
+    r = n - (q << 1) - (q << 3);
     return q + (r > 9);
 }
 
@@ -103,7 +103,7 @@ bios_decimal_digits(uint32_t value, char *outbuf)
     /* Build the decimal string */
     while (value) {
         unsigned int vdiv10 = bios_div10(value);
-        unsigned int rem = value - (vdiv10 << 2) - (vdiv10 << 8);
+        unsigned int rem = value - (vdiv10 << 1) - (vdiv10 << 3);
         outbuf[--offset] = '0' + rem;
         value = vdiv10;
     }
