@@ -17,7 +17,7 @@ module led_matrix #(
     input wire            wb_stb_i,
 
     // LED Drive Out
-    output reg [3:0]      latch_row_bank,
+    output wire [3:0]     latch_row_bank,
     output reg [7:0]      row_data,
     output wire           row_oe,
     output wire           col_first,
@@ -426,55 +426,23 @@ module led_matrix #(
     localparam COL_LATCH_STATE_3L = 8'b10000000;
     reg [7:0] col_latch_state;
     reg [7:0] next_col_latch_state;
+    assign latch_row_bank = {col_latch_state[7], col_latch_state[5], col_latch_state[3], col_latch_state[1]};
 
     reg       reset_latch_state;
     always @(*) begin
         row_data       = 8'b000000;
-        latch_row_bank = 4'b0000;
         reset_latch_state = 0;
         
         case (col_latch_state)
-        COL_LATCH_STATE_0: begin
-            row_data       = led_out_state[7:0];//debug[7:0];//
-            latch_row_bank = 4'b0000;
-        end
-    
-        COL_LATCH_STATE_0L: begin
-            row_data       = led_out_state[7:0];//debug[7:0];//
-            latch_row_bank = 4'b0001;
-        end
-    
-        COL_LATCH_STATE_1: begin
-            row_data       = led_out_state[15:8];//debug[15:8];//
-            latch_row_bank = 4'b0000;
-        end
-    
-        COL_LATCH_STATE_1L: begin
-            row_data       = led_out_state[15:8];//debug[15:8];//
-            latch_row_bank = 4'b0010;
-        end
-    
-        COL_LATCH_STATE_2: begin
-            row_data       = led_out_state[23:16];
-            latch_row_bank = 4'b0000;
-        end
-    
-        COL_LATCH_STATE_2L: begin
-            row_data       = led_out_state[23:16];
-            latch_row_bank = 4'b0100;
-        end
-    
-        COL_LATCH_STATE_3: begin
-            row_data       = {4'd0, led_out_state[27:24]};
-            latch_row_bank = 4'b0000;
-        end
-    
-        COL_LATCH_STATE_3L: begin
-            row_data       = {4'd0, led_out_state[27:24]};
-            latch_row_bank = 4'b1000;
-        end
-        default:
-            reset_latch_state = 1;
+        COL_LATCH_STATE_0:  row_data = led_out_state[7:0];  //debug[7:0];//
+        COL_LATCH_STATE_0L: row_data = led_out_state[7:0];  //debug[7:0];//
+        COL_LATCH_STATE_1:  row_data = led_out_state[15:8]; //debug[15:8];//
+        COL_LATCH_STATE_1L: row_data = led_out_state[15:8]; //debug[15:8];//
+        COL_LATCH_STATE_2:  row_data = led_out_state[23:16];
+        COL_LATCH_STATE_2L: row_data = led_out_state[23:16];
+        COL_LATCH_STATE_3:  row_data = {4'd0, led_out_state[27:24]};
+        COL_LATCH_STATE_3L: row_data = {4'd0, led_out_state[27:24]};
+        default: reset_latch_state = 1;
         endcase
     end
       
