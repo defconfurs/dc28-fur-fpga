@@ -367,7 +367,7 @@ module top (
       .externalResetVector(32'h00000000),
       .timerInterrupt(1'b0),
       .softwareInterrupt(1'b0),
-      .externalInterruptArray({31'h00000000, button_irq}),
+      .externalInterruptArray({30'h00000000, serial_irq, button_irq}),
   
       // Instruction Bus.
       .iBusWishbone_CYC(wbc_ibus_cyc),
@@ -478,6 +478,7 @@ module top (
       .usb_tx_en (usb_tx_en),
       
       // DFU state and debug
+      .irq(serial_irq),
       .dfu_detach(dfu_detach),
       .debug()
     );

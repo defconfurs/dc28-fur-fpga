@@ -11,10 +11,8 @@ libdir = os.path.join(srcdir, "lib")
 firmwaredir = os.path.join(srcdir, "firmware")
 ldsfile = os.path.join(firmwaredir,'firmware.lds')
 
-CFLAGS = ['-Os', '-march=rv32ic', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
+CFLAGS = ['-Os', '-march=rv32i', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
 CFLAGS += ['-ffunction-sections', '-fdata-sections', '--specs=nano.specs']
-CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_FLOAT=1', '-DPRINTF_DISABLE_SUPPORT_EXPONENTIAL=1']
-CFLAGS += ['-DPRINTF_DISABLE_SUPPORT_LONG_LONG=1', '-DPRINTF_DISABLE_SUPPORT_PTRDIFF_T=1']
 LDFLAGS = CFLAGS + ['-Wl,-Bstatic,-T,'+ldsfile+',--gc-sections']
 
 
@@ -54,7 +52,7 @@ stub_usb_srcs += ["usb_serial_core.v",
                   "usb_uart_in_ep.v",
                   "usb_uart_out_ep.v"]
 
-lib_srcs = ["VexRiscv_MinRvc.v",
+lib_srcs = ["VexRiscv_Min.v",
             "wbcdecoder.v",
             "wbcxbar.v",
             "wbcrouter.v",
@@ -176,7 +174,7 @@ def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48'):
        package (string): Package type of the FPGA (default: "sg48")
        *args (string): All other non-kwargs should provide the verilog files to be synthesized.
     """
-    synth_cmd = 'synth_ice40 -top ' + name + ' -json ' + name + '.json'
+    synth_cmd = 'synth_ice40 -abc2 -top ' + name + ' -json ' + name + '.json'
     if call([yosys, '-q', '-p', synth_cmd] + [os.path.join(srcdir, x) for x in args] ) != 0:
         return
     if call([nextpnr_ice40, device, '--package', package, '--opt-timing', '--pcf', pcf, '--json', name+'.json', '--asc', name+'.asc']) != 0:

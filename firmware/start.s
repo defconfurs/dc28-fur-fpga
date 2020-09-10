@@ -8,7 +8,6 @@
 .global _heap_start
 .global _stack_start
 .global main
-.global start
 .global bootload
 .global bootexit
 .global printf_
@@ -83,27 +82,51 @@ setup_crt:
     la a0, _sreldata
     la a1, _sdata
     la a2, _edata
-    beq a1, a2, sreldata_skip
-sreldata_loop:
-    lw a3, 0(a0)
-    sw a3, 0(a1)
-    addi a0,a0,4
-    addi a1,a1,4
-    bne a1, a2, sreldata_loop
-sreldata_skip:
+    sub a2, a2, a1
+    jal memcpy
 
-    # Zero-fill the .bss section.
-    la a0, _sbss
-    la a1, _ebss
-    beq a0, a1, bss_zfill_skip
-bss_zfill_loop:
-    sw x0, 0(a0)
-    addi a0,a0,4
-    bne a0, a1, bss_zfill_loop
-bss_zfill_skip:
+    # Zero-fill the .bss section. by falling-through to memset.
+    la   x1, main
+    la   a0, _sbss
+    la   a3, _ebss
+    addi a1, zero, 0
+    sub  a3, a3, a0
 
-    # C-Runtime is ready. Jump to main().
-    j main
+# A minimal memset - only accepts aligned pointers.
+.globl memset
+.type memset,@function
+memset:
+    # Build the fill
+    slli a4, a1, 8
+    add  a1, a1, a4
+    slli a4, a1, 16
+    add  a1, a1, a4
+    # Write memory.
+    add  a4, a0, a2  # a4 holds the end addres.
+    beqz a2, __memset_exit
+__memset_loop:
+    sw   a1, 0(a0)
+    addi a0, a0, 4
+    blt  a0, a4, __memset_loop
+__memset_exit:
+    sub  a0, a0, a2 # Return the start address.
+    ret
+
+# A minimal memcpy - only accepts aligned pointers.
+.globl memcpy
+.type memcpy,@function
+memcpy:
+    add a4, a1, a2  # a4 holds the end address
+    beqz a3, __memcpy_exit
+__memcpy_loop:
+    lw a5, 0(a1)    # Copy from source
+    addi a1, a1, 4  # increment source
+    sw a5, 0(a0)    # Write to dest
+    addi a0, a0, 4  # increment destination
+    blt a1, a4, __memcpy_loop
+__memcpy_exit:
+    sub a0, a0, a2  # Return the start address.
+    ret
 
 .align 4
 __trap_entry:
