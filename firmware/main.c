@@ -100,7 +100,7 @@ int main(void)
     /* Enable interrupts for testing */
     /* Not sure if this is a hardware problem, but BT0 is extremely noisy. */
     MISC->i_status = 0xF;
-    MISC->i_enable = 0x8;
+    MISC->i_enable = 0xA;
 
     /* Count the number of animations present. */
     count = 0;
