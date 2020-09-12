@@ -79,53 +79,53 @@ setup_crt:
     csrw 0xBC0, x29
     
     # Copy data from _sreldata to _sdata.
-    la a0, _sreldata
-    la a1, _sdata
+    la a0, _sdata
+    la a1, _sreldata
     la a2, _edata
-    sub a2, a2, a1
-    jal memcpy
+    sub a2, a2, a0
+    call memcpy
 
-    # Zero-fill the .bss section. by falling-through to memset.
-    la   x1, main
-    la   a0, _sbss
-    la   a3, _ebss
-    addi a1, zero, 0
-    sub  a3, a3, a0
+    # Fall-through to memset to zero-fill .bss and jump to main.
+    la x1, main
+    la a0, _sbss
+    la a1, 0
+    la a2, _ebss
+    sub a2, a2, a0
 
 # A minimal memset - only accepts aligned pointers.
 .globl memset
 .type memset,@function
 memset:
-    # Build the fill
-    slli a4, a1, 8
-    add  a1, a1, a4
-    slli a4, a1, 16
-    add  a1, a1, a4
-    # Write memory.
-    add  a4, a0, a2  # a4 holds the end addres.
-    beqz a2, __memset_exit
-__memset_loop:
+    beqz a2, 1f     # exit immediately if the count is zero.
+    # Generate the fill word.
+    srli a3, a1, 8
+    add  a1, a1, a3
+    srli a3, a1, 16
+    add  a1, a1, a3
+    # Fill memory.
+    add  a3, a0, a2 # a3 holds the end pointer.
+0:                  # start of the memset loop.
     sw   a1, 0(a0)
     addi a0, a0, 4
-    blt  a0, a4, __memset_loop
-__memset_exit:
-    sub  a0, a0, a2 # Return the start address.
+    blt  a0, a3, 0b # contiune as long as address < end.
+    sub  a0, a0, a2 # restore the dest pointer before returning.
+1:
     ret
 
 # A minimal memcpy - only accepts aligned pointers.
 .globl memcpy
 .type memcpy,@function
 memcpy:
-    add a4, a1, a2  # a4 holds the end address
-    beqz a3, __memcpy_exit
-__memcpy_loop:
-    lw a5, 0(a1)    # Copy from source
-    addi a1, a1, 4  # increment source
-    sw a5, 0(a0)    # Write to dest
-    addi a0, a0, 4  # increment destination
-    blt a1, a4, __memcpy_loop
-__memcpy_exit:
-    sub a0, a0, a2  # Return the start address.
+    beqz a2, 1f     # exit immediately if the count is zero.
+    add  a3, a1, a2 # a3 holds the source end pointer.
+0:                  # Start of the memcpy loop.
+    lw   a4, 0(a1)  # load a word from source.
+    addi a1, a1, 4
+    sw   a4, 0(a0)  # store a word to dest.
+    addi a0, a0, 4
+    blt  a1, a3, 0b # continue as long as source < end.
+    sub  a0, a0, a2 # restore the dest pointer before returning.
+1:
     ret
 
 .align 4
