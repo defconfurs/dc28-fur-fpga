@@ -97,10 +97,10 @@ int main(void)
     MISC->leds[1] = 255;
     MISC->leds[3] = 0;
 
-    /* Enable interrupts for testing */
-    /* Not sure if this is a hardware problem, but BT0 is extremely noisy. */
+    /* Enable interrupts */
     MISC->i_status = 0xF;
     MISC->i_enable = 0xA;
+    SERIAL->ier = SERIAL_INT_RXDATA_READY;
 
     /* Count the number of animations present. */
     count = 0;

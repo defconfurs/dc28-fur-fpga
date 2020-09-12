@@ -75,7 +75,7 @@ setup_crt:
     li x29, 0x008		# 0x008 Enable Interrupts
     csrw mstatus,x29
     # CSR_INT_MASK		# VexRiscV interupt mask.
-    li x29, 0x1
+    li x29, 0x3
     csrw 0xBC0, x29
     
     # Copy data from _sreldata to _sdata.

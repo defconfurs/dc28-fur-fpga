@@ -23,6 +23,22 @@ rv_irq_timer(int32_t *regs, uint32_t cause)
     bios_printf("Unexpected timer interrupt\n", cause);
 }
 
+static unsigned int rv_stdin_len;
+static unsigned int rv_stdin_ptr;
+static char rv_stdin_buf[256];
+
+static inline uint8_t
+serial_write_char(int ch)
+{
+    uint8_t status;
+    do {
+        status = SERIAL->isr;
+        if ((status & SERIAL_INT_DTR_ACTIVE) == 0) return status;
+    } while ((status & SERIAL_INT_TXFIFO_EMPTY) == 0);
+    SERIAL->txfifo = ch;
+    return status;
+}
+
 /*
  * On button press, we want to exit the currently running program, and return back
  * to the BIOS to switch animations. We do this by overwriting the return address
@@ -32,15 +48,30 @@ void
 rv_irq_extint(int32_t *regs)
 {
     uint8_t status = MISC->i_status;
-    /* Exit the animation, and seek forwards on left button. */
+
+    /* Exit the animation, and seek forwards on top button. */
     if (status & 0x08) {
         regs[10] = 1; /* set exit code */
         asm volatile ("csrw mepc, %0\n" :: "r"(&bootexit));
     }
-    /* Exit the animation, and seek backwards on right button. */
-    if (status & 0x04) {
+
+    /* Exit the animation, and seek backwards on bottom button. */
+    if (status & 0x02) {
         regs[10] = 2; /* set exit code */
         asm volatile ("csrw mepc, %0\n" :: "r"(&bootexit));
+    }
+
+    /* Process serial data input. */
+    status = SERIAL->isr;
+    while (status & SERIAL_INT_RXDATA_READY) {
+        char ch = SERIAL->rxfifo;
+        /* Save the character for read(). */
+        if (rv_stdin_len < sizeof(rv_stdin_buf)) {
+            rv_stdin_buf[(rv_stdin_ptr + rv_stdin_len) % sizeof(rv_stdin_buf)] = ch;
+            rv_stdin_len++;
+        }
+        /* Echo the character back to the host */
+        status = serial_write_char(ch);
     }
 
     /* Clear button interrupt events. */
@@ -49,6 +80,30 @@ rv_irq_extint(int32_t *regs)
 
 /* Local error number, used by syscalls. */
 static int32_t rv_errno;
+
+static int
+rv_read(int fd, void *buf, size_t count)
+{
+    uint8_t *data = buf;
+    uint8_t *end = data + count;
+    if ((fd == STDOUT_FILENO) || (fd == STDERR_FILENO)) {
+        return 0;
+    }
+    if (fd != STDIN_FILENO) {
+        rv_errno = EBADF;
+        return -1;
+    }
+    if (!rv_stdin_len) {
+        rv_errno = EAGAIN;
+        return -1;
+    }
+    while ((rv_stdin_len) && (data < end)) {
+        *data++ = rv_stdin_buf[rv_stdin_ptr++];
+        rv_stdin_ptr %= sizeof(rv_stdin_buf);
+        rv_stdin_len--;
+    }
+    return data - (const uint8_t *)buf;
+}
 
 static int
 rv_write(int fd, const void *buf, size_t count)
@@ -93,6 +148,10 @@ rv_ecall(uint32_t syscall, int32_t *regs, uint32_t excpc)
         case SYS_exit:
             regs[0] = 1;
             asm volatile ("csrw mepc, %0" :: "r"(&bootexit));
+            break;
+        
+        case SYS_read:
+            regs[0] = rv_read(regs[0], (void *)(uintptr_t)regs[1], regs[2]);
             break;
         
         case SYS_write:
