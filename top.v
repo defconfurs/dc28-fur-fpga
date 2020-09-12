@@ -57,7 +57,8 @@ module top (
     localparam WB_SEL_WIDTH  = (WB_DATA_WIDTH / 8);
     localparam WB_ADDR_WIDTH = 32 - $clog2(WB_SEL_WIDTH);
     localparam WB_MUX_WIDTH  = 4;
-    
+
+    localparam SAMPLE_DEPTH = 8;
     
     wire          stat_r;
     wire          stat_g;
@@ -499,13 +500,14 @@ module top (
     // wishbone connected LED PWM driver
     wire [1:0] buttons;
     wire       button_irq;
-    wire signed [7:0] audio;
+    wire signed [SAMPLE_DEPTH-1:0] audio;
 
     assign buttons = { pin_button_up, pin_button_down };
     
     wb_misc #(
       .AW( WB_SADDR_WIDTH ),
-      .DW(WB_DATA_WIDTH)
+      .DW( WB_DATA_WIDTH ),
+      .SAMPLE_DEPTH (SAMPLE_DEPTH)
     ) wb_misc_inst (
       .wb_clk_i   ( clk ),
       .wb_reset_i ( rst ),

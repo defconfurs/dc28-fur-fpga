@@ -137,13 +137,12 @@ module led_matrix #(
 
 
 
-    localparam LOAD_STATE_START_REQUEST     = 6'b000001;
-    localparam LOAD_STATE_REQUEST_DELAY     = 6'b000010;
-    localparam LOAD_STATE_COMPLETE_REQUEST  = 6'b000100;
-    localparam LOAD_STATE_GET_VALUE         = 6'b001000;
-    localparam LOAD_STATE_LOAD_WAIT         = 6'b010000;
-    localparam LOAD_STATE_DISPLAY           = 6'b100000;
-    reg [5:0] load_state = LOAD_STATE_START_REQUEST;
+    localparam LOAD_STATE_START_REQUEST     = 5'b00001;
+    localparam LOAD_STATE_COMPLETE_REQUEST  = 5'b00010;
+    localparam LOAD_STATE_GET_VALUE         = 5'b00100;
+    localparam LOAD_STATE_LOAD_WAIT         = 5'b01000;
+    localparam LOAD_STATE_DISPLAY           = 5'b10000;
+    reg [4:0] load_state = LOAD_STATE_START_REQUEST;
     
     
 
@@ -174,7 +173,6 @@ module led_matrix #(
   
 
     reg [TOTAL_LOAD_TIME_SIZE-1:0] load_timer = 0;
-    //wire [15:0]           load_timer;
 
     //===========================================================================================
     // Nonlinear timer
@@ -270,9 +268,6 @@ module led_matrix #(
     );
     assign ram_address    = dsp_output[31:16];
     
-    //assign ram_address = (latched_frame_address + 
-    //                      ({ ypos[3:0], xpos[4:1], xpos[0]^ypos[0] }));
-
 
     //==============================
     // PWM engine
@@ -322,15 +317,9 @@ module led_matrix #(
             LOAD_STATE_START_REQUEST: begin
                 frame_complete <= 0;
                 if (!ram_stb_valid) begin
-                    load_state <= LOAD_STATE_REQUEST_DELAY;
+                    load_state <= LOAD_STATE_COMPLETE_REQUEST;
                     ram_ready  <= 0;
                 end
-            end
-            
-            LOAD_STATE_REQUEST_DELAY: begin
-                frame_complete <= 0;
-                ram_ready      <= 0;
-                load_state     <= LOAD_STATE_COMPLETE_REQUEST;
             end
             
             LOAD_STATE_COMPLETE_REQUEST: begin
