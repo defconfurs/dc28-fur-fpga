@@ -2,7 +2,8 @@
 
 module led_matrix #(
     parameter AW = 32,
-    parameter DW = 32
+    parameter DW = 32,
+    parameter CLK_FREQ = 12000000
 )  (
     // Wishbone interface.
     input wire            wb_clk_i,
@@ -117,7 +118,8 @@ module led_matrix #(
 
     localparam N_COLS             = 10;
     localparam N_ROWS             = 14;
-    localparam SHIFT_CLOCK_PERIOD = 60;
+    localparam SHIFT_CLOCK_FREQ   = 200000;
+    localparam SHIFT_CLOCK_PERIOD = (CLK_FREQ / SHIFT_CLOCK_FREQ);
     localparam TOTAL_LOAD_TIME    = 2 * N_COLS / 2;
     localparam TOTAL_LINE_TIME    = 'h400; // don't forget to update for the maximum PWM time
 

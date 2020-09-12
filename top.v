@@ -126,13 +126,26 @@ module top (
     ////////
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
-    wire clk_48mhz;
+    wire clk_96mhz;
     wire clk_locked;
-    pll48mhz pll(
+    pll96mhz pll(
       .refclk(pin_clk),
-      .clk_48mhz(clk_48mhz),
+      .clk_output(clk_96mhz),
       .clk_locked(clk_locked)
     );
+
+    // Clock Division - produce a 48Mhz and 16Mhz clock.
+    reg clk_48mhz = 0;
+    reg clk_16mhz = 0;
+    always @(posedge clk_96mhz) clk_48mhz = ~clk_48mhz;
+    reg [1:0] clk_divide = 0;
+    always @(posedge clk_96mhz) begin
+      if (clk_divide) clk_divide <= clk_divide - 1;
+      else begin
+        clk_divide <= 2;
+        clk_16mhz <= ~clk_16mhz;
+      end
+    end
   
     wire lf_clk;
     SB_LFOSC LF_OscInst (
@@ -155,16 +168,11 @@ module top (
         reset_cnt <= 0;
       end
     end
-  
-    reg  clk_24mhz = 0;
-    reg  clk_12mhz = 0;
-    always @(posedge clk_48mhz) clk_24mhz <= ~clk_24mhz;
-    always @(posedge clk_24mhz) clk_12mhz <= ~clk_12mhz;
-    
+
     wire clk;
     wire rst;
-    localparam CLK_FREQ = 12000000;
-    assign clk = clk_12mhz;
+    localparam CLK_FREQ = 16000000;
+    assign clk = clk_16mhz;
     assign rst = reset;
   
   
@@ -405,7 +413,8 @@ module top (
     //---------------------------------------------------------------
     led_matrix #(
       .AW ( WB_SADDR_WIDTH ),
-      .DW ( WB_DATA_WIDTH )
+      .DW ( WB_DATA_WIDTH ),
+      .CLK_FREQ ( CLK_FREQ )
     ) led_matrix_inst (
       // Wishbone interface
       .wb_clk_i   ( clk ),
