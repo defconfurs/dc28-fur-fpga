@@ -8,10 +8,10 @@ from glob import glob
 
 srcdir = os.path.dirname(os.path.abspath(__file__))
 libdir = os.path.join(srcdir, "lib")
-firmwaredir = os.path.join(srcdir, "firmware")
-ldsfile = os.path.join(firmwaredir,'firmware.lds')
+bootdir = os.path.join(srcdir, "bootloader")
+ldsfile = os.path.join(bootdir,'bootrom.lds')
 
-CFLAGS = ['-Os', '-march=rv32i', '-mabi=ilp32', '-I', '.', '-I', firmwaredir]
+CFLAGS = ['-Os', '-march=rv32i', '-mabi=ilp32', '-I', bootdir]
 CFLAGS += ['-ffunction-sections', '-fdata-sections', '--specs=nano.specs']
 LDFLAGS = CFLAGS + ['-Wl,-Bstatic,-T,'+ldsfile+',--gc-sections']
 
@@ -42,8 +42,9 @@ dfu_usb_srcs += ["usb_dfu_core.v",
                 "usb_dfu_ctrl_ep.v",
                 "usb_spiflash_bridge.v"]
 
-boot_srcs = [ os.path.join('bootloader', 'tinydfu.v'), 'pll48mhz.v' ]
+boot_srcs = [ os.path.join(bootdir, 'tinydfu.v'), 'pll48mhz.v' ]
 boot_srcs += [ os.path.join(rtl_usb_dir, x) for x in dfu_usb_srcs ] 
+bootrom_srcs = [ os.path.join(bootdir, "bootrom.s") ]
 
 # User Bitstream sources.
 stub_usb_srcs = rtl_usb_srcs
@@ -62,8 +63,6 @@ sources = glob(os.path.join(srcdir, '*.v'))
 sources += [ os.path.join(rtl_usb_dir, x) for x in stub_usb_srcs ]
 sources += [ os.path.join(libdir, x) for x in lib_srcs ]
 
-firmwareFiles = ["coldboot.s"]
-firmwareSources = [ os.path.join(firmwaredir, x) for x in firmwareFiles ]
 
 
 #######################################
@@ -214,8 +213,7 @@ def build_rom(*args, name='firmware'):
 
     objfiles = []
     
-    for x in args:
-        infile = os.path.join(firmwaredir, x)
+    for infile in args:
         outfile = os.path.splitext(infile)[0] + '.o'
         objfiles += [outfile]
         
@@ -225,7 +223,7 @@ def build_rom(*args, name='firmware'):
             return
 
     #$(CROSS_COMPILE)gcc $(LDFLAGS) -o $@ $^
-    elffile = os.path.join(firmwaredir, name + '.elf')
+    elffile = os.path.join(bootdir, name + '.elf')
     print("   Linking    [" + elffile + "]")
     if call([gcc] + LDFLAGS + ['-o', elffile] + objfiles) != 0:
         print("---- Error compiling ----")
@@ -233,7 +231,7 @@ def build_rom(*args, name='firmware'):
 
     #%.bin: %.elf
     #   $(CROSS_COMPILE)objcopy -O binary $^ $@
-    binfile = os.path.join(firmwaredir, name + '.bin')
+    binfile = os.path.join(bootdir, name + '.bin')
     print("   Generating [" + binfile + "]")
     if call([objcopy, '-O', 'binary', elffile, binfile]) != 0:
         return
@@ -268,7 +266,9 @@ def simulate(*args, name='top', tempdir='./sim'):
 #######################################
 def clean():
     del_files = glob('*.bin')+glob('*.blif')+glob('*.rpt')+glob('*.asc') + glob('*.json')
-    del_files += glob(os.path.join(firmwaredir, '*.o'))
+    del_files += glob(os.path.join(bootdir, '*.o'))
+    del_files += glob(os.path.join(bootdir, '*.elf'))
+    del_files += glob(os.path.join(bootdir, '*.bin'))
     del_files += glob('*.mem') + glob('*.elf')
     for del_file in del_files:
         os.remove(del_file)
@@ -298,7 +298,7 @@ def main():
             newstuff += ['bootloader']
 
             
-        if check_rebuild_rom(*firmwareSources):
+        if check_rebuild_rom(*bootrom_srcs):
             newstuff += ['buildrom']
             
         # check main build
@@ -322,7 +322,7 @@ def main():
             build(*sources, name='top', pcf=pcf_file)
 
         elif command == 'buildrom':
-            build_rom(*firmwareSources)
+            build_rom(*bootrom_srcs)
             
         elif command == 'generate':
             generate()

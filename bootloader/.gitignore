@@ -1,5 +1,10 @@
+## Verilog Build Files
 *.json
 *.asc
 *.rpt
 *.bin
-tinydfu_pll.v
+
+## BootROM Build Files
+*.elf
+*.bin
+*.o
