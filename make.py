@@ -62,11 +62,7 @@ sources = glob(os.path.join(srcdir, '*.v'))
 sources += [ os.path.join(rtl_usb_dir, x) for x in stub_usb_srcs ]
 sources += [ os.path.join(libdir, x) for x in lib_srcs ]
 
-
-firmwareFiles = ["start.s",
-                 "main.c",
-                 "trap.c",
-                 "bios_printf.c"]
+firmwareFiles = ["coldboot.s"]
 firmwareSources = [ os.path.join(firmwaredir, x) for x in firmwareFiles ]
 
 

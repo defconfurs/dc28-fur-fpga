@@ -536,21 +536,21 @@ module top (
     );
   
     //---------------------------------------------------------------
-    // Boot ROM
-    bootrom#(
+    // Boot Memory
+    wbbootmem#(
       .AW(WB_XADDR_WIDTH),
       .DW(WB_DATA_WIDTH)
-    ) vexbootrom(
-      .wb_clk_i  (clk),
-      .wb_reset_i(rst),
-      .wb_adr_i(wb_bootrom_addr),
-      .wb_dat_i(wb_bootrom_wdata),
-      .wb_dat_o(wb_bootrom_rdata),
-      .wb_we_i(wb_bootrom_we),
-      .wb_sel_i(wb_bootrom_sel),
-      .wb_ack_o(wb_bootrom_ack),
-      .wb_cyc_i(wb_bootrom_cyc),
-      .wb_stb_i(wb_bootrom_stb)
+    ) vexbootmem(
+      .wb_clk_i  ( clk ),
+      .wb_reset_i( rst ),
+      .wb_adr_i  ( wb_bootrom_addr ),
+      .wb_dat_i  ( wb_bootrom_wdata ),
+      .wb_dat_o  ( wb_bootrom_rdata ),
+      .wb_we_i   ( wb_bootrom_we ),
+      .wb_sel_i  ( wb_bootrom_sel ),
+      .wb_ack_o  ( wb_bootrom_ack ),
+      .wb_cyc_i  ( wb_bootrom_cyc ),
+      .wb_stb_i  ( wb_bootrom_stb )
     );
   
     //---------------------------------------------------------------
