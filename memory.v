@@ -189,6 +189,13 @@ module simple_ram #(//512x8
     
     reg [data_width-1:0] mem [(1<<addr_width)-1:0];
     
+    integer i;
+    initial begin
+        for (i = 0; i < (1<<addr_width); i = i+1) begin
+            mem[i] = 0;
+        end
+    end
+    
     always @(posedge clk) // Write memory.
     begin
         if (we)

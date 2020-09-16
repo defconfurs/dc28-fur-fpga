@@ -117,7 +117,9 @@ module top (
     wire flash_busy;
     assign flash_busy = 0;
     
-    wire       frame_complete;
+    wire frame_complete;
+
+    wire serial_irq;
       
     ////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////
@@ -458,7 +460,6 @@ module top (
     wire usb_n_rx;
     wire usb_tx_en;
     
-    wire serial_irq;
     wire dfu_detach;
   
     // USB Serial Core.
@@ -673,7 +674,7 @@ module top (
 
     
     pdm_mic #(
-      .SAMPLE_DEPTH      ( 8 )
+      .SAMPLE_DEPTH ( SAMPLE_DEPTH )
     ) mic_inst (
       .clk ( clk ),
       .rst ( rst ),
@@ -681,7 +682,7 @@ module top (
       .mic_clk  ( pin_mic_clk ),
       .mic_data ( pin_mic_data ),
     
-      .audio1 ( audio )
+      .audio ( audio )
     );
 
                      

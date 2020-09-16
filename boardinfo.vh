@@ -19,9 +19,11 @@ localparam SPI_SECURITY_REG_SHIFT = 8;
 
 /* USB VID/PID Definitions */
 localparam BOARD_VID = 'h1d50;  /* OpenMoko Inc. */
+//localparam BOARD_PID = 'h6130;  /* TinyFPGA Bootloader 6130 */
 localparam BOARD_PID = 'h612C;  /* TinyFPGA Bootloader 6130 */
 
 /* String Descriptors */
 localparam BOARD_MFR_NAME = "DCFurs";
+//localparam BOARD_PRODUCT_NAME = "DC28-Booploader";
 localparam BOARD_PRODUCT_NAME = "DC28-IsWorking";
 localparam BOARD_SERIAL = "FEE5h";

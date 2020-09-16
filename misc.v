@@ -51,9 +51,9 @@ module wb_misc #(
     localparam REG_MUL_XRESULT  = 4'hF; /* Extended result - reserved for 64-bit support. */
 
     // Interrupt bits
-    localparam REG_INTBIT_BT0_RISING = 0;
+    localparam REG_INTBIT_BT0_RISING  = 0;
     localparam REG_INTBIT_BT0_FALLING = 1;
-    localparam REG_INTBIT_BT1_RISING = 2;
+    localparam REG_INTBIT_BT1_RISING  = 2;
     localparam REG_INTBIT_BT1_FALLING = 3;
 
     reg [3:0] btn_int_status = 0;
@@ -61,6 +61,8 @@ module wb_misc #(
     wire [DW-1:0] dsp_mul_result;
     reg [3:0]  dsp_flags = 0;
     wire [3:0] dsp_status;
+
+    reg [1:0]  filtered_buttons;
 
     ///////////////////////////////////////
     // Wishbone Registers.
@@ -79,44 +81,45 @@ module wb_misc #(
             reg_int_enable   <= 8'h00;
             reg_int_status   <= 8'h00;
         end
-        // Register Write
-        else if (stb_valid && wb_we_i && wb_sel_i[0]) begin
-            case (reg_addr)
-            REG_LED_RED:    reg_intensity[0] <= wb_dat_i[7:0];
-            REG_LED_GREEN:  reg_intensity[1] <= wb_dat_i[7:0];
-            REG_LED_BLUE:   reg_intensity[2] <= wb_dat_i[7:0];
-            REG_INT_ENABLE: reg_int_enable   <= wb_dat_i[3:0];
-            REG_INT_STATUS: reg_int_status   <= (reg_int_status & ~wb_dat_i[3:0]);
-            REG_MUL_CTRL:   dsp_flags        <= wb_dat_i[7:4];
-            endcase
-        end
-        // Update interrupt status
         else begin
+            // Update interrupt status
             reg_int_status <= reg_int_status | btn_int_status;
-        end
+            
+            // Register Write
+            if (stb_valid && wb_we_i && wb_sel_i[0]) begin
+                case (reg_addr)
+                REG_LED_RED:    reg_intensity[0] <= wb_dat_i[7:0];
+                REG_LED_GREEN:  reg_intensity[1] <= wb_dat_i[7:0];
+                REG_LED_BLUE:   reg_intensity[2] <= wb_dat_i[7:0];
+                REG_INT_ENABLE: reg_int_enable   <= wb_dat_i[3:0];
+                REG_INT_STATUS: reg_int_status   <= (reg_int_status & ~wb_dat_i[3:0]);
+                REG_MUL_CTRL:   dsp_flags        <= wb_dat_i[7:4];
+                endcase
+            end
 
-        // Register Read
-        if (stb_valid && ~wb_we_i) begin
-            wb_dat_o <= 0;
-            case (reg_addr)
-            REG_LED_RED:    wb_dat_o[   7:0] <= reg_intensity[0];
-            REG_LED_GREEN:  wb_dat_o[   7:0] <= reg_intensity[1];
-            REG_LED_BLUE:   wb_dat_o[   7:0] <= reg_intensity[2];
-            REG_BUTTONS:    wb_dat_o[   1:0] <= buttons;
-            REG_MIC_DATA:   wb_dat_o[DW-1:0] <= { {(DW-SAMPLE_DEPTH){audio[SAMPLE_DEPTH-1]}}, audio };
-            REG_INT_ENABLE: wb_dat_o[   3:0] <= reg_int_enable;
-            REG_INT_STATUS: wb_dat_o[   3:0] <= reg_int_status;
-            REG_MUL_CTRL:   wb_dat_o[   7:0] <= { {(DW-8){1'b0}}, dsp_flags, dsp_status };
-            REG_MUL_RESULT: wb_dat_o[DW-1:0] <= dsp_mul_result;
-            default:        wb_dat_o <= 0;
-            endcase
+            // Register Read
+            else if (stb_valid && ~wb_we_i) begin
+                wb_dat_o <= 0;
+                case (reg_addr)
+                REG_LED_RED:    wb_dat_o[   7:0] <= reg_intensity[0];
+                REG_LED_GREEN:  wb_dat_o[   7:0] <= reg_intensity[1];
+                REG_LED_BLUE:   wb_dat_o[   7:0] <= reg_intensity[2];
+                REG_BUTTONS:    wb_dat_o[   1:0] <= filtered_buttons;
+                REG_MIC_DATA:   wb_dat_o[DW-1:0] <= { {(DW-SAMPLE_DEPTH){audio[SAMPLE_DEPTH-1]}}, audio };
+                REG_INT_ENABLE: wb_dat_o[   3:0] <= reg_int_enable;
+                REG_INT_STATUS: wb_dat_o[   3:0] <= reg_int_status;
+                REG_MUL_CTRL:   wb_dat_o[   7:0] <= { {(DW-8){1'b0}}, dsp_flags, dsp_status };
+                REG_MUL_RESULT: wb_dat_o[DW-1:0] <= dsp_mul_result;
+                default:        wb_dat_o <= 0;
+                endcase
+            end
         end
     end
 
     ///////////////////////////////////////
     // PWM Generation
     ///////////////////////////////////////
-    reg [15:0] pwm_counter = 0;
+    reg [14:0] pwm_counter = 0;
     always @(posedge wb_clk_i) pwm_counter <= pwm_counter + 1;
 
     assign leds[0] = (reg_intensity[0] > pwm_counter[7:0]);
@@ -127,14 +130,26 @@ module wb_misc #(
     // Button Edge Detector
     ///////////////////////////////////////
     // Lazy debouncing by using a really slow clock.
-    reg [1:0] buttons_prev = 0;
-    always @(posedge pwm_counter[15]) begin
-        buttons_prev <= buttons;
-        btn_int_status[REG_INTBIT_BT0_RISING]  <= ~buttons_prev[0] &&  buttons[0];
-        btn_int_status[REG_INTBIT_BT0_FALLING] <=  buttons_prev[0] && ~buttons[0];
-        btn_int_status[REG_INTBIT_BT1_RISING]  <= ~buttons_prev[1] &&  buttons[1];
-        btn_int_status[REG_INTBIT_BT1_FALLING] <=  buttons_prev[1] && ~buttons[1];
+    reg [1:0] buttons_filt_0 = 0;
+    reg [1:0] buttons_filt_1 = 0;
+    always @(posedge pwm_counter[14]) begin
+        buttons_filt_0 <= buttons;
+        buttons_filt_1 <= buttons_filt_0;
+        
+        if (buttons[0] == buttons_filt_0[0] == buttons_filt_1[0]) filtered_buttons[0] <= buttons[0];
+        if (buttons[1] == buttons_filt_0[1] == buttons_filt_1[1]) filtered_buttons[1] <= buttons[1];
     end
+
+    reg [1:0] last_filtered_buttons;
+    always @(posedge wb_clk_i) begin
+        last_filtered_buttons <= filtered_buttons;
+
+        btn_int_status[REG_INTBIT_BT0_FALLING] <= (last_filtered_buttons[0] ^ filtered_buttons[0]) && !filtered_buttons[0];
+        btn_int_status[REG_INTBIT_BT0_RISING]  <= (last_filtered_buttons[0] ^ filtered_buttons[0]) &&  filtered_buttons[0];
+        btn_int_status[REG_INTBIT_BT1_FALLING] <= (last_filtered_buttons[1] ^ filtered_buttons[1]) && !filtered_buttons[1];
+        btn_int_status[REG_INTBIT_BT1_RISING]  <= (last_filtered_buttons[1] ^ filtered_buttons[1]) &&  filtered_buttons[1];
+    end
+    
 
     ///////////////////////////////////////
     // Hardware Multiply Helper
