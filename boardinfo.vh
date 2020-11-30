@@ -44,11 +44,11 @@ localparam SPI_SECURITY_REGISTERS = 3;
 localparam SPI_SECURITY_REG_SHIFT = 8;
 
 /* USB VID/PID Definitions */
-localparam BOARD_VID = 'h1d50;  /* OpenMoko Inc. */
+localparam BOARD_VID = 'h26F3;  /* Raven Systems Design, Inc */
 `ifdef BOOTLOADER
-localparam BOARD_PID = 'h6130;  /* TinyFPGA Bootloader 6130 */
+localparam BOARD_PID = 'h1338;  /* DEFCON Furs DC28 Booploader */
 `else
-localparam BOARD_PID = 'h612C;  /* TinyFPGA Bootloader 6130 */
+localparam BOARD_PID = 'h1337;  /* DEFCON Furs DC28 Badge */
 `endif
 
 /* String Descriptors */
