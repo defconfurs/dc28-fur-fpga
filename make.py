@@ -42,7 +42,7 @@ dfu_usb_srcs += ["usb_dfu_core.v",
                 "usb_dfu_ctrl_ep.v",
                 "usb_spiflash_bridge.v"]
 
-boot_srcs = [ os.path.join(bootdir, 'tinydfu.v'), os.path.join(bootdir, 'pll48mhz.v') ]
+boot_srcs = [ os.path.join(bootdir, 'tinydfu.v'), 'pll96mhz.v' ]
 boot_srcs += [ os.path.join(rtl_usb_dir, x) for x in dfu_usb_srcs ] 
 bootrom_srcs = [ os.path.join(bootdir, "bootrom.s") ]
 

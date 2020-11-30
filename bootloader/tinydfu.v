@@ -48,14 +48,15 @@ assign stat_en = 1;
 /////////////////////////////
 // Clock and Reset Generation
 /////////////////////////////
-wire clk_48mhz;
-wire clk = clkdiv[1];
-reg [1:0] clkdiv = 0;
+wire clk_96mhz;
+wire clk_48mhz = clkdiv[0];
+wire clk = clkdiv[2];
+reg [2:0] clkdiv = 0;
 
 // Use an icepll generated pll
 wire clk_locked;
-pll48mhz pll( .refclk(pin_clk), .clk_48mhz(clk_48mhz), .clk_locked(clk_locked) );
-always @(posedge clk_48mhz) clkdiv <= clkdiv + 1;
+pll96mhz pll( .refclk(pin_clk), .clk_output(clk_96mhz), .clk_locked(clk_locked) );
+always @(posedge clk_96mhz) clkdiv <= clkdiv + 1;
 
 wire rst;
 reg [7:0] rst_delay = 8'hFF;
