@@ -45,11 +45,18 @@ localparam SPI_SECURITY_REG_SHIFT = 8;
 
 /* USB VID/PID Definitions */
 localparam BOARD_VID = 'h1d50;  /* OpenMoko Inc. */
-//localparam BOARD_PID = 'h6130;  /* TinyFPGA Bootloader 6130 */
+`ifdef BOOTLOADER
+localparam BOARD_PID = 'h6130;  /* TinyFPGA Bootloader 6130 */
+`else
 localparam BOARD_PID = 'h612C;  /* TinyFPGA Bootloader 6130 */
+`endif
 
 /* String Descriptors */
-localparam BOARD_MFR_NAME = "DCFurs";
-//localparam BOARD_PRODUCT_NAME = "DC28-Booploader";
-localparam BOARD_PRODUCT_NAME = "DC28-IsWorking";
+localparam BOARD_MFR_NAME = "DEFCON Furs";
+`ifdef BOOTLOADER
+localparam BOARD_PRODUCT_NAME = "DEFCON Furs DC28 Booploader";
 localparam BOARD_SERIAL = "FEE5h";
+`else
+localparam BOARD_PRODUCT_NAME = "DEFCON Furs DC28 Badge";
+localparam BOARD_SERIAL = "OwO ~notices your badge~";
+`endif

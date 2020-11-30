@@ -184,7 +184,7 @@ def check_rebuild(*args, name='top', pcf='top.pcf'):
 #######################################
 ## Build an FPGA Bitstream
 #######################################
-def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48'):
+def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48', defines=[]):
     """Build an FPGA Bitstream for an iCE40 FPGA.
 
     Args:
@@ -195,7 +195,10 @@ def build(*args, name='top', pcf='top.pcf', device='--up5k', package='sg48'):
        *args (string): All other non-kwargs should provide the verilog files to be synthesized.
     """
     synth_cmd = 'synth_ice40 -abc2 -top ' + name + ' -json ' + name + '.json'
-    if call([yosys, '-q', '-p', synth_cmd] + [os.path.join(srcdir, x) for x in args] ) != 0:
+    macros = []
+    for d in defines:
+        macros += ['-D', d]
+    if call([yosys, '-q', '-p', synth_cmd] + macros + [os.path.join(srcdir, x) for x in args] ) != 0:
         return
     if call([nextpnr_ice40, device, '--package', package, '--opt-timing', '--pcf', pcf, '--json', name+'.json', '--asc', name+'.asc']) != 0:
         return
@@ -354,7 +357,7 @@ def main():
 
         elif command == 'bootloader' or command == "booploader":
             build('bootloader/firstboot.v', name='firstboot', pcf=pcf_file)
-            build(*boot_srcs, name='tinydfu', pcf=pcf_file)
+            build(*boot_srcs, name='tinydfu', pcf=pcf_file, defines=['BOOTLOADER'])
         
         elif command == 'multiboot':
             if call([icemulti, '-v', '-o', 'multiboot.bin', '-a15', 'firstboot.bin', 'tinydfu.bin', 'top.bin']) != 0:
