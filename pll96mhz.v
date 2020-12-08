@@ -19,7 +19,7 @@ module pll96mhz(
 SB_PLL40_CORE #(
     .FEEDBACK_PATH("SIMPLE"),
     .DIVR(4'b0000),        // DIVR =  0
-    .DIVF(7'b0111111),     // DIVF = 63
+    .DIVF(7'b1011111),     // DIVF = 63
     .DIVQ(3'b011),         // DIVQ =  3
     .FILTER_RANGE(3'b001)  // FILTER_RANGE = 1
 ) usb_pll_inst (
